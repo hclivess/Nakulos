@@ -395,7 +395,7 @@ class JSHandler(tornado.web.RequestHandler):
 
 
 class AggregationHandler(tornado.web.RequestHandler):
-    def post(self):
+    def get(self):
         metrics_storage.aggregate_and_cleanup()
         self.write({"status": "Aggregation and cleanup completed"})
 
