@@ -1,4 +1,5 @@
 import psycopg2
+from psycopg2 import sql
 from psycopg2.extras import RealDictCursor
 import logging
 from contextlib import contextmanager
@@ -46,11 +47,44 @@ class Database:
             self.conn = None
             logger.info("Database connection closed")
 
-db = None
 
+def create_database_if_not_exists(config):
+    conn = None
+    try:
+        conn = psycopg2.connect(
+            host=config['host'],
+            database='postgres',  # Connect to the default database
+            user=config['username'],
+            password=config['password'],
+            port=config['port']
+        )
+        conn.autocommit = True
+        with conn.cursor() as cursor:
+            cursor.execute(
+                sql.SQL("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s"),
+                [config['database_name']]
+            )
+            exists = cursor.fetchone()
+            if not exists:
+                cursor.execute(sql.SQL("CREATE DATABASE {}").format(
+                    sql.Identifier(config['database_name'])
+                ))
+                logger.info(f"Database {config['database_name']} created")
+            else:
+                logger.info(f"Database {config['database_name']} already exists")
+    except (Exception, psycopg2.Error) as error:
+        logger.error(f"Error while creating database: {error}")
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
+db = None
 
 def init_db(config):
     global db
+    create_database_if_not_exists(config)
     db = Database(config)
     db.connect()
 
@@ -93,7 +127,6 @@ def init_db(config):
             )
         ''')
         db.conn.commit()
-
 
 def get_db():
     return db
