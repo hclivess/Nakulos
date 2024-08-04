@@ -368,6 +368,27 @@ class DowntimeHandler(BaseHandler):
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
+    async def delete(self):
+        try:
+            data = json.loads(self.request.body)
+            with self.db.get_cursor() as cursor:
+                try:
+                    cursor.execute("DELETE FROM downtimes WHERE id = %s", (data['id'],))
+                    if cursor.rowcount == 0:
+                        self.set_status(404)
+                        self.write({"error": "Downtime not found"})
+                        return
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
+
+            self.write({"status": "success"})
+        except Exception as e:
+            logger.error(f"Error in DowntimeHandler DELETE: {str(e)}")
+            self.set_status(500)
+            self.write({"error": "Internal server error"})
 
 class RecentAlertsHandler(BaseHandler):
     def initialize(self):
