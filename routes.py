@@ -1,13 +1,11 @@
-from tornado.web import Application
-import tornado
-
+import tornado.web
 from handlers import (MainHandler, MetricsHandler, FetchLatestHandler,
                       FetchHistoryHandler, FetchHostsHandler, AlertConfigHandler,
                       AlertStateHandler, DowntimeHandler, RecentAlertsHandler,
-                      DashboardHandler, JSHandler)
+                      DashboardHandler, JSHandler, AggregateDataHandler)
 
 def make_app(metric_processor):
-    return Application([
+    return tornado.web.Application([
         (r"/", MainHandler),
         (r"/metrics", MetricsHandler, dict(metric_processor=metric_processor)),
         (r"/fetch/latest", FetchLatestHandler),
@@ -23,5 +21,6 @@ def make_app(metric_processor):
         (r"/alerts.js", JSHandler, {"filename": "alerts.js"}),
         (r"/downtimes.js", JSHandler, {"filename": "downtimes.js"}),
         (r"/utils.js", JSHandler, {"filename": "utils.js"}),
+        (r"/aggregate", AggregateDataHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"}),
     ])

@@ -3,6 +3,7 @@ import json
 import time
 import logging
 from database import get_db
+from data_aggregator import aggregate_data
 
 logger = logging.getLogger(__name__)
 
@@ -141,16 +142,7 @@ class AlertConfigHandler(BaseHandler):
     async def post(self):
         try:
             data = json.loads(self.request.body)
-            logger.info(f"Received alert config data: {data}")  # Log received data
-
-            required_fields = ['hostname', 'metric_name', 'condition', 'threshold', 'duration']
-            if not all(field in data for field in required_fields):
-                self.set_status(400)
-                self.write({"error": "Missing required fields"})
-                return
-
             with self.db.get_cursor() as cursor:
-                # Check if the host exists
                 cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (data['hostname'],))
                 host = cursor.fetchone()
                 if not host:
@@ -158,7 +150,6 @@ class AlertConfigHandler(BaseHandler):
                     self.write({"error": "Host not found"})
                     return
 
-                # Insert the new alert
                 cursor.execute("""
                     INSERT INTO alerts (host_id, metric_name, condition, threshold, duration, enabled)
                     VALUES (%s, %s, %s, %s, %s, %s)
@@ -168,10 +159,6 @@ class AlertConfigHandler(BaseHandler):
                 self.db.conn.commit()
 
             self.write({"status": "success", "id": alert_id})
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON in request body")
-            self.set_status(400)
-            self.write({"error": "Invalid JSON in request body"})
         except Exception as e:
             logger.error(f"Error in AlertConfigHandler POST: {str(e)}")
             self.set_status(500)
@@ -348,5 +335,16 @@ class JSHandler(BaseHandler):
                 self.write(file.read())
         except Exception as e:
             logger.error(f"Error in JSHandler: {str(e)}")
+            self.set_status(500)
+            self.write({"error": "Internal server error"})
+
+
+class AggregateDataHandler(BaseHandler):
+    def get(self):
+        try:
+            aggregate_data()
+            self.write({"status": "Data aggregation triggered successfully"})
+        except Exception as e:
+            logger.error(f"Error in AggregateDataHandler: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
