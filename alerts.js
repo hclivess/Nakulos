@@ -63,8 +63,12 @@ async function addAlertConfig(event) {
 
 async function deleteAlertConfig(id) {
     try {
-        const response = await fetch(`/alert_config/${id}`, {
+        const response = await fetch(`/alert_config`, {
             method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id }),
         });
 
         if (response.ok) {
@@ -136,5 +140,8 @@ function setupAlertUpdates() {
         updateRecentAlerts(document.querySelector('#hostSelector select').value);
     }, updateInterval);
 }
+
+window.deleteAlertConfig = deleteAlertConfig;
+window.toggleAlertState = toggleAlertState;
 
 export { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates };

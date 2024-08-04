@@ -26,14 +26,12 @@ async function updateDowntimes(hostname) {
 
 async function addDowntime(event) {
     event.preventDefault();
-    const selectedHostname = document.querySelector('#hostSelector select').value;
+    const hostname = document.querySelector('#hostSelector select').value;
     const downtimeConfig = {
-        hostname: selectedHostname === 'all' ? document.getElementById('downtimeHostname').value : selectedHostname,
+        hostname: hostname === 'all' ? document.getElementById('downtimeHostname').value : hostname,
         start_time: new Date(document.getElementById('downtimeStart').value).getTime() / 1000,
         end_time: new Date(document.getElementById('downtimeEnd').value).getTime() / 1000
     };
-
-    console.log('Sending downtime config:', downtimeConfig);
 
     try {
         const response = await fetch('/downtime', {
@@ -47,10 +45,8 @@ async function addDowntime(event) {
         if (response.ok) {
             console.log('Downtime added successfully');
             document.getElementById('downtimeForm').reset();
-            await updateDowntimes(selectedHostname);
         } else {
-            const errorData = await response.json();
-            console.error('Failed to add downtime:', errorData.error);
+            console.error('Failed to add downtime');
         }
     } catch (error) {
         console.error('Error adding downtime:', error);
@@ -78,4 +74,5 @@ async function deleteDowntime(id) {
     }
 }
 
+window.deleteDowntime = deleteDowntime;
 export { updateDowntimes, addDowntime, deleteDowntime };
