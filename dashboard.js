@@ -1,5 +1,3 @@
-// dashboard.js
-
 import { initChart, updateChart } from './chart.js';
 import { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates } from './alerts.js';
 import { updateDowntimes, addDowntime, deleteDowntime } from './downtimes.js';

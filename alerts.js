@@ -141,4 +141,5 @@ function setupAlertUpdates() {
     }, updateInterval);
 }
 
+window.deleteAlertConfig = deleteAlertConfig;
 export { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates };

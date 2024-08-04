@@ -74,4 +74,5 @@ async function deleteDowntime(id) {
     }
 }
 
+window.deleteDowntime = deleteDowntime;
 export { updateDowntimes, addDowntime, deleteDowntime };
