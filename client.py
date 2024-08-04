@@ -1,3 +1,5 @@
+# client.py
+
 import socket
 import tornado.ioloop
 import tornado.httpclient
@@ -5,6 +7,10 @@ import json
 import importlib.util
 import os
 import time
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class MetricPoint:
     def __init__(self, value, timestamp=None):
@@ -46,20 +52,23 @@ class MonitoringClient:
         self.metrics_store = MetricsStore()
         self.hostname = socket.gethostname()
         self.additional_data = self.config.get('additional_data', {})
+        logger.info(f"MonitoringClient initialized with config: {self.config}")
 
     def load_config(self):
         try:
             with open('client_config.json', 'r') as config_file:
-                return json.load(config_file)
+                config = json.load(config_file)
+                logger.info(f"Loaded config: {config}")
+                return config
         except FileNotFoundError:
-            print("Config file not found. Using default configuration.")
+            logger.error("Config file not found. Using default configuration.")
             return {
                 "server_url": "http://localhost:8888",
                 "interval": 60,
                 "metrics_dir": "./metrics"
             }
         except json.JSONDecodeError:
-            print("Invalid JSON in config file. Using default configuration.")
+            logger.error("Invalid JSON in config file. Using default configuration.")
             return {
                 "server_url": "http://localhost:8888",
                 "interval": 60,
@@ -77,6 +86,7 @@ class MonitoringClient:
                 spec.loader.exec_module(module)
                 if hasattr(module, 'collect'):
                     modules[module_name] = module
+                    logger.info(f"Loaded metric module: {module_name}")
         return modules
 
     def collect_metrics(self):
@@ -84,8 +94,9 @@ class MonitoringClient:
             try:
                 value = module.collect()
                 self.metrics_store.add_metric(name, value)
+                logger.info(f"Collected metric {name}: {value}")
             except Exception as e:
-                print(f"Error collecting metric {name}: {e}")
+                logger.error(f"Error collecting metric {name}: {e}", exc_info=True)
         return self.metrics_store.get_all_latest()
 
     async def send_metrics(self):
@@ -99,6 +110,7 @@ class MonitoringClient:
                 "metrics": metrics_to_send,
                 "additional_data": self.additional_data
             }
+            logger.info(f"Preparing to send metrics: {data_to_send}")
             try:
                 response = await client.fetch(
                     self.server_url + "/metrics",
@@ -107,9 +119,9 @@ class MonitoringClient:
                 )
                 response_body = response.body.decode('utf-8')
                 response_json = json.loads(response_body)
-                print(f"Sent metrics: {data_to_send}, response: {response_json}")
+                logger.info(f"Sent metrics: {data_to_send}, response: {response_json}")
             except Exception as e:
-                print(f"Error sending metrics: {e}")
+                logger.error(f"Error sending metrics: {e}", exc_info=True)
             await tornado.gen.sleep(self.interval)
 
 if __name__ == "__main__":

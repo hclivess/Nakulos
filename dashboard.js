@@ -1,5 +1,7 @@
+// dashboard.js
+
 import { initChart, updateChart } from './chart.js';
-import { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState } from './alerts.js';
+import { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates } from './alerts.js';
 import { updateDowntimes, addDowntime, deleteDowntime } from './downtimes.js';
 import { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility } from './utils.js';
 
@@ -79,31 +81,6 @@ function updateHostInfo(hostname, additionalData) {
     `;
 }
 
-async function updateRecentAlerts(hostname) {
-    try {
-        const response = await fetch(`/fetch/recent_alerts?hostname=${hostname}`);
-        const alerts = await response.json();
-        const alertsList = document.getElementById('recentAlertsList');
-        alertsList.innerHTML = '';
-        if (alerts.length === 0) {
-            alertsList.innerHTML = '<div class="alert alert-info">No recent alerts.</div>';
-        } else {
-            alerts.forEach(alert => {
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-warning';
-                alertDiv.innerHTML = `
-                    <strong>${hostname === 'all' ? alert.hostname + ' - ' : ''}${alert.alert_metric}</strong>:
-                    Value ${alert.alert_value} ${alert.alert_condition} ${alert.alert_threshold}
-                    at ${new Date(alert.timestamp * 1000).toLocaleString()}
-                `;
-                alertsList.appendChild(alertDiv);
-            });
-        }
-    } catch (error) {
-        console.error('Error updating recent alerts:', error);
-    }
-}
-
 function setupTimeRangeButtons() {
     const timeRanges = ['hour', 'day', 'week', 'month'];
     timeRanges.forEach(range => {
@@ -122,6 +99,7 @@ async function initDashboard() {
     setTimeRange('hour');
     await updateDashboard('all');
     updateFormVisibility('all');
+    setupAlertUpdates();
 }
 
 function startDashboardUpdater() {
@@ -134,15 +112,15 @@ function startDashboardUpdater() {
 // Event listeners
 document.getElementById('alertForm').addEventListener('submit', async (event) => {
     event.preventDefault();
+    await addAlertConfig(event);
     const hostname = document.querySelector('#hostSelector select').value;
-    await addAlertConfig(event, hostname);
     await updateAlertConfigs(hostname);
 });
 
 document.getElementById('downtimeForm').addEventListener('submit', async (event) => {
     event.preventDefault();
+    await addDowntime(event);
     const hostname = document.querySelector('#hostSelector select').value;
-    await addDowntime(event, hostname);
     await updateDowntimes(hostname);
 });
 

@@ -3,6 +3,7 @@ from psycopg2 import sql
 from psycopg2.extras import RealDictCursor
 import logging
 from contextlib import contextmanager
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,6 @@ class Database:
             self.conn = None
             logger.info("Database connection closed")
 
-
 def create_database_if_not_exists(config):
     conn = None
     try:
@@ -78,7 +78,6 @@ def create_database_if_not_exists(config):
     finally:
         if conn:
             conn.close()
-
 
 db = None
 
@@ -126,7 +125,36 @@ def init_db(config):
                 end_time FLOAT NOT NULL
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS alert_history (
+                id SERIAL PRIMARY KEY,
+                host_id INTEGER REFERENCES hosts(id),
+                alert_id INTEGER REFERENCES alerts(id),
+                timestamp FLOAT NOT NULL,
+                value FLOAT NOT NULL
+            )
+        ''')
         db.conn.commit()
 
 def get_db():
     return db
+
+def load_config(config_path='server_config.json'):
+    try:
+        with open(config_path, 'r') as config_file:
+            return json.load(config_file)
+    except FileNotFoundError:
+        logger.error(f"Config file not found: {config_path}")
+        raise
+    except json.JSONDecodeError:
+        logger.error(f"Invalid JSON in config file: {config_path}")
+        raise
+
+def setup_database():
+    config = load_config()
+    init_db(config['database'])
+    logger.info("Database setup completed")
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    setup_database()

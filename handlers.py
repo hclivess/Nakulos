@@ -381,30 +381,37 @@ class DowntimeHandler(BaseHandler):
 
 
 class RecentAlertsHandler(BaseHandler):
+    def initialize(self):
+        self.db = get_db()
+
     async def get(self):
         try:
             hostname = self.get_argument('hostname', None)
             limit = int(self.get_argument('limit', 10))
 
+            logger.info(f"Fetching recent alerts for hostname: {hostname}, limit: {limit}")
+
             query = """
-                SELECT h.hostname, m.timestamp, m.value as alert_details
-                FROM metrics m
-                JOIN hosts h ON m.host_id = h.id
-                WHERE m.metric_name = 'alert_triggered'
+                SELECT ah.id, h.hostname, a.metric_name, ah.timestamp, ah.value, 
+                       a.condition, a.threshold
+                FROM alert_history ah
+                JOIN alerts a ON ah.alert_id = a.id
+                JOIN hosts h ON ah.host_id = h.id
             """
             params = []
 
             if hostname and hostname != 'all':
-                query += " AND h.hostname = %s"
+                query += " WHERE h.hostname = %s"
                 params.append(hostname)
 
-            query += " ORDER BY m.timestamp DESC LIMIT %s"
+            query += " ORDER BY ah.timestamp DESC LIMIT %s"
             params.append(limit)
 
             with self.db.get_cursor() as cursor:
                 try:
                     cursor.execute(query, params)
                     recent_alerts = cursor.fetchall()
+                    logger.info(f"Fetched {len(recent_alerts)} recent alerts")
                 except Exception as e:
                     logger.error(f"Database operation failed: {e}")
                     self.set_status(500)
@@ -413,11 +420,17 @@ class RecentAlertsHandler(BaseHandler):
 
             result = [
                 {
+                    "id": alert['id'],
                     "hostname": alert['hostname'],
+                    "metric_name": alert['metric_name'],
                     "timestamp": alert['timestamp'],
-                    "alert_details": alert['alert_details']
+                    "value": alert['value'],
+                    "condition": alert['condition'],
+                    "threshold": alert['threshold']
                 } for alert in recent_alerts
             ]
+
+            logger.info(f"Sending response with {len(result)} alerts")
             self.write(json.dumps(result))
         except Exception as e:
             logger.error(f"Error in RecentAlertsHandler: {str(e)}")

@@ -1,6 +1,8 @@
+// alerts.js
+
 async function updateAlertConfigs(hostname) {
     try {
-        const response = await fetch('/alert_config');
+        const response = await fetch(`/alert_config?hostname=${hostname}`);
         const configs = await response.json();
         const configList = document.getElementById('alertConfigList');
         configList.innerHTML = '';
@@ -17,7 +19,7 @@ async function updateAlertConfigs(hostname) {
                             ${config.enabled ? 'checked' : ''} onchange="toggleAlertState(${config.id}, '${config.hostname}', '${config.metric_name}', this.checked)">
                         <label class="form-check-label" for="alertEnabled_${config.id}">Enabled</label>
                     </div>
-                    <button class="btn btn-danger btn-sm" onclick="deleteAlertConfig('${config.hostname}', '${config.metric_name}')">Delete</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteAlertConfig(${config.id})">Delete</button>
                 </div>
             `;
             configList.appendChild(configDiv);
@@ -49,7 +51,7 @@ async function addAlertConfig(event) {
         if (response.ok) {
             console.log('Alert config added successfully');
             document.getElementById('alertForm').reset();
-            await updateAlertConfigs();  // Refresh the list of alerts
+            await updateAlertConfigs(document.querySelector('#hostSelector select').value);
         } else {
             const errorData = await response.json();
             console.error('Failed to add alert config:', errorData.error);
@@ -59,18 +61,14 @@ async function addAlertConfig(event) {
     }
 }
 
-async function deleteAlertConfig(hostname, metric_name) {
+async function deleteAlertConfig(id) {
     try {
-        const response = await fetch('/alert_config', {
+        const response = await fetch(`/alert_config/${id}`, {
             method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ hostname, metric_name }),
         });
 
         if (response.ok) {
-            console.log(`Alert config deleted for ${hostname} - ${metric_name}`);
+            console.log(`Alert config deleted for id ${id}`);
             await updateAlertConfigs(document.querySelector('#hostSelector select').value);
         } else {
             console.error('Failed to delete alert config');
@@ -87,7 +85,7 @@ async function toggleAlertState(id, hostname, metric_name, enabled) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ hostname, metric_name, enabled }),
+            body: JSON.stringify({ id, enabled }),
         });
 
         if (response.ok) {
@@ -100,4 +98,43 @@ async function toggleAlertState(id, hostname, metric_name, enabled) {
     }
 }
 
-export { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState };
+async function updateRecentAlerts(hostname) {
+    try {
+        const response = await fetch(`/fetch/recent_alerts?hostname=${hostname}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const alerts = await response.json();
+        console.log('Fetched recent alerts:', alerts);  // For debugging
+
+        const alertsList = document.getElementById('recentAlertsList');
+        alertsList.innerHTML = '';
+
+        if (alerts.length === 0) {
+            alertsList.innerHTML = '<div class="alert alert-info">No recent alerts.</div>';
+        } else {
+            alerts.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-warning';
+                alertDiv.innerHTML = `
+                    <strong>${hostname === 'all' ? alert.hostname + ' - ' : ''}${alert.metric_name}</strong>:
+                    Value ${alert.value} ${alert.condition} ${alert.threshold}
+                    at ${new Date(alert.timestamp * 1000).toLocaleString()}
+                `;
+                alertsList.appendChild(alertDiv);
+            });
+        }
+    } catch (error) {
+        console.error('Error updating recent alerts:', error);
+    }
+}
+
+function setupAlertUpdates() {
+    const updateInterval = 60000; // Update every minute
+    updateRecentAlerts(document.querySelector('#hostSelector select').value);
+    setInterval(() => {
+        updateRecentAlerts(document.querySelector('#hostSelector select').value);
+    }, updateInterval);
+}
+
+export { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates };
