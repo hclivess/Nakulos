@@ -51,8 +51,8 @@ function updateFormVisibility(selectedHostname) {
         hostnameField.style.display = 'block';
         downtimeHostnameField.style.display = 'block';
     } else {
-        hostnameField.style.display = 'block';
-        downtimeHostnameField.style.display = 'block';
+        hostnameField.style.display = 'none';
+        downtimeHostnameField.style.display = 'none';
         document.getElementById('hostname').value = selectedHostname;
         document.getElementById('downtimeHostname').value = selectedHostname;
     }

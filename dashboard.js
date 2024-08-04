@@ -1,5 +1,3 @@
-// dashboard.js
-
 import { initChart, updateChart } from './chart.js';
 import { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates } from './alerts.js';
 import { updateDowntimes, addDowntime, deleteDowntime } from './downtimes.js';
@@ -122,6 +120,11 @@ document.getElementById('downtimeForm').addEventListener('submit', async (event)
     await addDowntime(event);
     const hostname = document.querySelector('#hostSelector select').value;
     await updateDowntimes(hostname);
+});
+
+document.getElementById('updateButton').addEventListener('click', async () => {
+    const hostname = document.querySelector('#hostSelector select').value;
+    await updateDashboard(hostname);
 });
 
 // Initialize the dashboard
