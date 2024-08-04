@@ -70,6 +70,7 @@ function createHostSelector(hosts) {
     selector.appendChild(select);
 }
 
+
 function updateHostInfo(hostname, additionalData) {
     const hostInfo = document.getElementById('hostInfo');
     hostInfo.innerHTML = `
@@ -98,6 +99,13 @@ async function initDashboard() {
     await updateDashboard('all');
     updateFormVisibility('all');
     setupAlertUpdates();
+
+    document.getElementById('downtimeForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        await addDowntime(event);
+        const hostname = document.querySelector('#hostSelector select').value;
+        await updateDowntimes(hostname);
+    });
 }
 
 function startDashboardUpdater() {

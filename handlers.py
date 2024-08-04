@@ -302,39 +302,59 @@ class DowntimeHandler(BaseHandler):
                 try:
                     cursor.execute(query, params)
                     downtimes = cursor.fetchall()
+                    logger.info(f"Fetched {len(downtimes)} downtimes for hostname: {hostname}")
                 except Exception as e:
-                    logger.error(f"Database operation failed: {e}")
+                    logger.error(f"Database operation failed: {e}", exc_info=True)
                     self.set_status(500)
                     self.write({"error": "Internal server error"})
                     return
 
-            result = [dict(d) for d in downtimes]
+            result = [
+                {
+                    "id": downtime['id'],
+                    "hostname": downtime['hostname'],
+                    "start_time": downtime['start_time'],
+                    "end_time": downtime['end_time']
+                } for downtime in downtimes
+            ]
+            logger.info(f"Sending downtime data: {result}")
             self.write(json.dumps(result))
         except Exception as e:
-            logger.error(f"Error in DowntimeHandler GET: {str(e)}")
+            logger.error(f"Error in DowntimeHandler GET: {str(e)}", exc_info=True)
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
     async def post(self):
         try:
             data = json.loads(self.request.body)
+            logger.info(f"Received downtime data: {data}")
+
+            if 'hostname' not in data:
+                logger.error("Hostname not provided in downtime data")
+                self.set_status(400)
+                self.write({"error": "Hostname not provided"})
+                return
+
             with self.db.get_cursor() as cursor:
                 try:
                     cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (data['hostname'],))
                     host = cursor.fetchone()
                     if not host:
+                        logger.error(f"Host not found: {data['hostname']}")
                         self.set_status(404)
                         self.write({"error": "Host not found"})
                         return
 
+                    logger.info(f"Inserting downtime for host_id: {host['id']}")
                     cursor.execute("""
                         INSERT INTO downtimes (host_id, start_time, end_time)
                         VALUES (%s, %s, %s)
                         RETURNING id
                     """, (host['id'], data['start_time'], data['end_time']))
                     downtime_id = cursor.fetchone()['id']
+                    logger.info(f"Downtime inserted with id: {downtime_id}")
                 except Exception as e:
-                    logger.error(f"Database operation failed: {e}")
+                    logger.error(f"Database operation failed: {e}", exc_info=True)
                     self.set_status(500)
                     self.write({"error": "Internal server error"})
                     return
@@ -342,29 +362,7 @@ class DowntimeHandler(BaseHandler):
             self.write({"status": "success", "id": downtime_id})
 
         except Exception as e:
-            logger.error(f"Error in DowntimeHandler POST: {str(e)}")
-            self.set_status(500)
-            self.write({"error": "Internal server error"})
-
-    async def delete(self):
-        try:
-            data = json.loads(self.request.body)
-            with self.db.get_cursor() as cursor:
-                try:
-                    cursor.execute("DELETE FROM downtimes WHERE id = %s", (data['id'],))
-                    if cursor.rowcount == 0:
-                        self.set_status(404)
-                        self.write({"error": "Downtime not found"})
-                        return
-                except Exception as e:
-                    logger.error(f"Database operation failed: {e}")
-                    self.set_status(500)
-                    self.write({"error": "Internal server error"})
-                    return
-
-            self.write({"status": "success"})
-        except Exception as e:
-            logger.error(f"Error in DowntimeHandler DELETE: {str(e)}")
+            logger.error(f"Error in DowntimeHandler POST: {str(e)}", exc_info=True)
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
