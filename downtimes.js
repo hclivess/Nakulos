@@ -24,8 +24,9 @@ async function updateDowntimes(hostname) {
     }
 }
 
-async function addDowntime(event, hostname) {
+async function addDowntime(event) {
     event.preventDefault();
+    const hostname = document.querySelector('#hostSelector select').value;
     const downtimeConfig = {
         hostname: hostname === 'all' ? document.getElementById('downtimeHostname').value : hostname,
         start_time: new Date(document.getElementById('downtimeStart').value).getTime() / 1000,
