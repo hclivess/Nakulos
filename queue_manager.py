@@ -68,6 +68,7 @@ class MetricProcessor(QueueManager):
         metric_name = item['metric_name']
         value = item['value']
         timestamp = item['timestamp']
+        additional_data = item.get('additional_data', {}) #todo
 
         logger.info(f"Processing metric: {hostname} - {metric_name}: {value}")
 

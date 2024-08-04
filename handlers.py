@@ -29,13 +29,15 @@ class MetricsHandler(BaseHandler):
             hostname = data['hostname']
             metrics = data['metrics']
             timestamp = time.time()
+            additional_data = data.get('additional_data', {})
 
             for metric_name, value in metrics.items():
                 metric_data = {
                     'hostname': hostname,
                     'metric_name': metric_name,
                     'value': value,
-                    'timestamp': timestamp
+                    'timestamp': timestamp,
+                    'additional_data': additional_data
                 }
                 self.metric_processor.enqueue_metric(metric_data)
 
