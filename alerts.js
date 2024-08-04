@@ -27,10 +27,10 @@ async function updateAlertConfigs(hostname) {
     }
 }
 
-async function addAlertConfig(event, hostname) {
+async function addAlertConfig(event) {
     event.preventDefault();
     const alertConfig = {
-        hostname: hostname === 'all' ? document.getElementById('hostname').value : hostname,
+        hostname: document.getElementById('hostname').value,
         metric_name: document.getElementById('metric_name').value,
         condition: document.getElementById('condition').value,
         threshold: parseFloat(document.getElementById('threshold').value),
@@ -49,8 +49,10 @@ async function addAlertConfig(event, hostname) {
         if (response.ok) {
             console.log('Alert config added successfully');
             document.getElementById('alertForm').reset();
+            await updateAlertConfigs();  // Refresh the list of alerts
         } else {
-            console.error('Failed to add alert config');
+            const errorData = await response.json();
+            console.error('Failed to add alert config:', errorData.error);
         }
     } catch (error) {
         console.error('Error adding alert config:', error);

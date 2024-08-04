@@ -1,13 +1,26 @@
-import sqlite3
+import psycopg2
 import random
 import time
 from datetime import datetime
 import math
+import json
 
-# Database connection
-conn = sqlite3.connect('metrics.db')
-cursor = conn.cursor()
+def load_config():
+    with open('server_config.json', 'r') as config_file:
+        return json.load(config_file)
 
+config = load_config()
+
+# Database connection function
+def get_db_connection():
+    db_config = config['database']
+    return psycopg2.connect(
+        host=db_config['host'],
+        database=db_config['database_name'],
+        user=db_config['username'],
+        password=db_config['password'],
+        port=db_config['port']
+    )
 
 def generate_test_data(num_hosts, days_of_data, metrics_per_hour):
     print("Generating test data...")
@@ -22,23 +35,29 @@ def generate_test_data(num_hosts, days_of_data, metrics_per_hour):
         day_progress = (hour / 24) * 2 * math.pi
 
         if metric == 'cpu_usage':
-            # CPU usage fluctuates more during work hours
             return base_value + 20 * math.sin(day_progress) + random.uniform(-5, 5)
         elif metric == 'memory_usage':
-            # Memory usage gradually increases and resets (e.g., due to restarts)
             return (base_value + (timestamp - start_time) / (3600 * 24)) % 100
         elif metric == 'disk_usage':
-            # Disk usage slowly increases over time
             return min(base_value + (timestamp - start_time) / (3600 * 24 * 10), 100)
         elif metric in ['network_in', 'network_out']:
-            # Network traffic has peaks during work hours
             return base_value + 30 * math.sin(day_progress) + random.uniform(-10, 10)
 
     total_data_points = num_hosts * len(metrics) * days_of_data * 24 * metrics_per_hour
     points_generated = 0
 
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
     for host in hosts:
         print(f"Generating data for {host}")
+        # Insert host
+        cursor.execute(
+            "INSERT INTO hosts (hostname, alias, location) VALUES (%s, %s, %s) RETURNING id",
+            (host, f"Alias for {host}", "Test Location")
+        )
+        host_id = cursor.fetchone()[0]
+
         base_values = {metric: random.uniform(20, 60) for metric in metrics}
 
         current_time = start_time
@@ -48,25 +67,57 @@ def generate_test_data(num_hosts, days_of_data, metrics_per_hour):
                 value = max(0, min(value, 100))  # Ensure value is between 0 and 100
 
                 cursor.execute('''
-                    INSERT INTO metrics (hostname, metric_name, timestamp, value, additional_data)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (host, metric, current_time, value, '{"location": "Test Location"}'))
+                    INSERT INTO metrics (host_id, metric_name, timestamp, value)
+                    VALUES (%s, %s, %s, %s)
+                ''', (host_id, metric, current_time, value))
 
                 points_generated += 1
                 if points_generated % 10000 == 0:
                     print(f"Generated {points_generated}/{total_data_points} data points")
+                    conn.commit()  # Commit every 10000 points
 
             current_time += 3600 / metrics_per_hour
 
     conn.commit()
+    cursor.close()
+    conn.close()
     print("Data generation complete.")
 
 def clear_test_data():
     print("Clearing existing test data...")
-    cursor.execute("DELETE FROM metrics WHERE hostname LIKE 'host_%'")
-    conn.commit()
-    print("Test data cleared.")
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
+    try:
+        # First, delete related records in downtimes table
+        cursor.execute("""
+            DELETE FROM downtimes 
+            WHERE host_id IN (SELECT id FROM hosts WHERE hostname LIKE 'host_%')
+        """)
+
+        # Then, delete related records in alerts table
+        cursor.execute("""
+            DELETE FROM alerts 
+            WHERE host_id IN (SELECT id FROM hosts WHERE hostname LIKE 'host_%')
+        """)
+
+        # Now delete the metrics
+        cursor.execute("""
+            DELETE FROM metrics 
+            WHERE host_id IN (SELECT id FROM hosts WHERE hostname LIKE 'host_%')
+        """)
+
+        # Finally, delete the hosts
+        cursor.execute("DELETE FROM hosts WHERE hostname LIKE 'host_%'")
+
+        conn.commit()
+        print("Test data cleared successfully.")
+    except Exception as e:
+        conn.rollback()
+        print(f"An error occurred while clearing test data: {e}")
+    finally:
+        cursor.close()
+        conn.close()
 
 if __name__ == "__main__":
     num_hosts = int(input("Enter the number of hosts to generate: "))
@@ -80,6 +131,3 @@ if __name__ == "__main__":
     end_time = time.time()
 
     print(f"Data generation took {end_time - start_time:.2f} seconds.")
-
-    # Close the database connection
-    conn.close()
