@@ -103,18 +103,55 @@ class FetchHistoryHandler(BaseHandler):
         try:
             start = float(self.get_argument("start", 0))
             end = float(self.get_argument("end", time.time()))
-            limit = int(self.get_argument("limit", 1000))
+            max_points = int(self.get_argument("max_points", 500))
+
+            logger.info(f"Fetching history for {hostname}, metric: {metric_name}, start: {start}, end: {end}, max_points: {max_points}")
 
             with self.db.get_cursor() as cursor:
                 try:
+                    # First, get the count of data points
                     cursor.execute("""
-                        SELECT timestamp, value
+                        SELECT COUNT(*) as count
                         FROM metrics m
                         JOIN hosts h ON m.host_id = h.id
                         WHERE h.hostname = %s AND m.metric_name = %s AND m.timestamp BETWEEN %s AND %s
-                        ORDER BY m.timestamp DESC
-                        LIMIT %s
-                    """, (hostname, metric_name, start, end, limit))
+                    """, (hostname, metric_name, start, end))
+                    total_points = cursor.fetchone()['count']
+
+                    if total_points > max_points:
+                        # If we have more points than max_points, we'll use a sampling technique
+                        interval = (end - start) / max_points
+                        cursor.execute("""
+                            WITH sampled AS (
+                                SELECT 
+                                    m.timestamp, 
+                                    m.value,
+                                    width_bucket(m.timestamp, %s, %s, %s) AS bucket
+                                FROM metrics m
+                                JOIN hosts h ON m.host_id = h.id
+                                WHERE h.hostname = %s AND m.metric_name = %s AND m.timestamp BETWEEN %s AND %s
+                            )
+                            SELECT timestamp, value
+                            FROM (
+                                SELECT 
+                                    timestamp, 
+                                    value,
+                                    row_number() OVER (PARTITION BY bucket ORDER BY timestamp) AS rn
+                                FROM sampled
+                            ) sub
+                            WHERE rn = 1
+                            ORDER BY timestamp
+                        """, (start, end, max_points, hostname, metric_name, start, end))
+                    else:
+                        # If we're under max_points, fetch all points
+                        cursor.execute("""
+                            SELECT m.timestamp, m.value
+                            FROM metrics m
+                            JOIN hosts h ON m.host_id = h.id
+                            WHERE h.hostname = %s AND m.metric_name = %s AND m.timestamp BETWEEN %s AND %s
+                            ORDER BY m.timestamp
+                        """, (hostname, metric_name, start, end))
+
                     history = cursor.fetchall()
                 except Exception as e:
                     logger.error(f"Database operation failed: {e}")
@@ -123,6 +160,7 @@ class FetchHistoryHandler(BaseHandler):
                     return
 
             result = [[row['timestamp'], row['value']] for row in history]
+            logger.info(f"Sending response with {len(result)} data points out of {total_points} total")
             self.write(json.dumps(result))
         except Exception as e:
             logger.error(f"Error in FetchHistoryHandler: {str(e)}")
