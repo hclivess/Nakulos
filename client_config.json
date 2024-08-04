@@ -1,0 +1,9 @@
+{
+    "server_url": "http://localhost:8888",
+    "interval": 60,
+    "metrics_dir": "./metrics",
+    "additional_data": {
+        "alias": "My Server",
+        "location": "Data Center 1"
+    }
+}

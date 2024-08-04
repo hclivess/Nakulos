@@ -39,20 +39,32 @@ class MetricsStore:
 
 class MonitoringClient:
     def __init__(self):
-        self.config = {
-            "server_url": "http://localhost:8888",
-            "interval": 60,
-            "metrics_dir": "./metrics"
-        }
+        self.config = self.load_config()
         self.server_url = self.config['server_url']
         self.interval = self.config['interval']
         self.metrics_modules = self.load_metric_modules()
         self.metrics_store = MetricsStore()
         self.hostname = socket.gethostname()
-        self.additional_data = {
-            "alias": "My Server",  # You can set this to whatever you want
-            "location": "Data Center 1"
-        }
+        self.additional_data = self.config.get('additional_data', {})
+
+    def load_config(self):
+        try:
+            with open('config_client.json', 'r') as config_file:
+                return json.load(config_file)
+        except FileNotFoundError:
+            print("Config file not found. Using default configuration.")
+            return {
+                "server_url": "http://localhost:8888",
+                "interval": 60,
+                "metrics_dir": "./metrics"
+            }
+        except json.JSONDecodeError:
+            print("Invalid JSON in config file. Using default configuration.")
+            return {
+                "server_url": "http://localhost:8888",
+                "interval": 60,
+                "metrics_dir": "./metrics"
+            }
 
     def load_metric_modules(self):
         modules = {}
