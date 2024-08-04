@@ -142,4 +142,6 @@ function setupAlertUpdates() {
 }
 
 window.deleteAlertConfig = deleteAlertConfig;
+window.toggleAlertState = toggleAlertState;
+
 export { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates };
