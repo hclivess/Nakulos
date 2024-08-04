@@ -60,6 +60,9 @@ class MetricProcessor(QueueManager):
         self.db = get_db()
         logger.info("MetricProcessor initialized")
 
+    def enqueue_metric(self, metric_data):
+        self.queue.put(metric_data)
+
     def _process_item(self, item):
         hostname = item['hostname']
         metric_name = item['metric_name']

@@ -30,26 +30,14 @@ class MetricsHandler(BaseHandler):
             metrics = data['metrics']
             timestamp = time.time()
 
-            with self.db.get_cursor() as cursor:
-                try:
-                    cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (hostname,))
-                    host = cursor.fetchone()
-                    if not host:
-                        cursor.execute("INSERT INTO hosts (hostname) VALUES (%s) RETURNING id", (hostname,))
-                        host = cursor.fetchone()
-
-                    host_id = host['id']
-
-                    for metric_name, value in metrics.items():
-                        cursor.execute('''
-                            INSERT INTO metrics (host_id, metric_name, timestamp, value)
-                            VALUES (%s, %s, %s, %s)
-                        ''', (host_id, metric_name, timestamp, value))
-                except Exception as e:
-                    logger.error(f"Database operation failed: {e}")
-                    self.set_status(500)
-                    self.write({"error": "Internal server error"})
-                    return
+            for metric_name, value in metrics.items():
+                metric_data = {
+                    'hostname': hostname,
+                    'metric_name': metric_name,
+                    'value': value,
+                    'timestamp': timestamp
+                }
+                self.metric_processor.enqueue_metric(metric_data)
 
             self.write({"status": "received"})
         except Exception as e:
