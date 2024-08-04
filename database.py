@@ -1,9 +1,9 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import logging
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
-
 
 class Database:
     def __init__(self, config):
@@ -11,52 +11,40 @@ class Database:
         self.conn = None
 
     def connect(self):
-        try:
-            # First, connect to the default 'postgres' database
-            conn = psycopg2.connect(
-                host=self.config['host'],
-                database='postgres',
-                user=self.config['username'],
-                password=self.config['password'],
-                port=self.config['port']
-            )
-            conn.autocommit = True  # Enable autocommit to create database
-            cursor = conn.cursor()
+        if self.conn is None:
+            try:
+                self.conn = psycopg2.connect(
+                    host=self.config['host'],
+                    database=self.config['database_name'],
+                    user=self.config['username'],
+                    password=self.config['password'],
+                    port=self.config['port']
+                )
+                logger.info("Database connection established")
+            except (Exception, psycopg2.Error) as error:
+                logger.error(f"Error while connecting to PostgreSQL: {error}")
+                raise
 
-            # Check if our database exists
-            cursor.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (self.config['database_name'],))
-            exists = cursor.fetchone()
-            if not exists:
-                cursor.execute(f"CREATE DATABASE {self.config['database_name']}")
-                logger.info(f"Created database {self.config['database_name']}")
-
-            cursor.close()
-            conn.close()
-
-            # Now connect to our newly created database
-            self.conn = psycopg2.connect(
-                host=self.config['host'],
-                database=self.config['database_name'],
-                user=self.config['username'],
-                password=self.config['password'],
-                port=self.config['port']
-            )
-            logger.info("Database connection established")
-        except (Exception, psycopg2.Error) as error:
-            logger.error(f"Error while connecting to PostgreSQL: {error}")
-            raise
-
+    @contextmanager
     def get_cursor(self):
         if self.conn is None:
             self.connect()
-        return self.conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+            yield cursor
+            self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Database error: {e}")
+            raise
+        finally:
+            cursor.close()
 
     def close(self):
         if self.conn:
             self.conn.close()
             self.conn = None
             logger.info("Database connection closed")
-
 
 db = None
 

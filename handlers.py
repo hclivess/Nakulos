@@ -30,13 +30,26 @@ class MetricsHandler(BaseHandler):
             metrics = data['metrics']
             timestamp = time.time()
 
-            for metric_name, value in metrics.items():
-                self.metric_processor.enqueue({
-                    'hostname': hostname,
-                    'metric_name': metric_name,
-                    'value': value,
-                    'timestamp': timestamp
-                })
+            with self.db.get_cursor() as cursor:
+                try:
+                    cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (hostname,))
+                    host = cursor.fetchone()
+                    if not host:
+                        cursor.execute("INSERT INTO hosts (hostname) VALUES (%s) RETURNING id", (hostname,))
+                        host = cursor.fetchone()
+
+                    host_id = host['id']
+
+                    for metric_name, value in metrics.items():
+                        cursor.execute('''
+                            INSERT INTO metrics (host_id, metric_name, timestamp, value)
+                            VALUES (%s, %s, %s, %s)
+                        ''', (host_id, metric_name, timestamp, value))
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             self.write({"status": "received"})
         except Exception as e:
@@ -49,18 +62,24 @@ class FetchLatestHandler(BaseHandler):
     async def get(self):
         try:
             with self.db.get_cursor() as cursor:
-                cursor.execute("""
-                    SELECT h.hostname, m.metric_name, m.timestamp, m.value, h.alias, h.location
-                    FROM metrics m
-                    JOIN hosts h ON m.host_id = h.id
-                    WHERE (h.id, m.metric_name, m.timestamp) IN (
-                        SELECT host_id, metric_name, MAX(timestamp)
-                        FROM metrics
-                        GROUP BY host_id, metric_name
-                    )
-                    ORDER BY h.hostname, m.metric_name
-                """)
-                results = cursor.fetchall()
+                try:
+                    cursor.execute("""
+                        SELECT h.hostname, m.metric_name, m.timestamp, m.value, h.alias, h.location
+                        FROM metrics m
+                        JOIN hosts h ON m.host_id = h.id
+                        WHERE (h.id, m.metric_name, m.timestamp) IN (
+                            SELECT host_id, metric_name, MAX(timestamp)
+                            FROM metrics
+                            GROUP BY host_id, metric_name
+                        )
+                        ORDER BY h.hostname, m.metric_name
+                    """)
+                    results = cursor.fetchall()
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             latest_metrics = {}
             for row in results:
@@ -87,15 +106,21 @@ class FetchHistoryHandler(BaseHandler):
             limit = int(self.get_argument("limit", 1000))
 
             with self.db.get_cursor() as cursor:
-                cursor.execute("""
-                    SELECT timestamp, value
-                    FROM metrics m
-                    JOIN hosts h ON m.host_id = h.id
-                    WHERE h.hostname = %s AND m.metric_name = %s AND m.timestamp BETWEEN %s AND %s
-                    ORDER BY m.timestamp DESC
-                    LIMIT %s
-                """, (hostname, metric_name, start, end, limit))
-                history = cursor.fetchall()
+                try:
+                    cursor.execute("""
+                        SELECT timestamp, value
+                        FROM metrics m
+                        JOIN hosts h ON m.host_id = h.id
+                        WHERE h.hostname = %s AND m.metric_name = %s AND m.timestamp BETWEEN %s AND %s
+                        ORDER BY m.timestamp DESC
+                        LIMIT %s
+                    """, (hostname, metric_name, start, end, limit))
+                    history = cursor.fetchall()
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             result = [[row['timestamp'], row['value']] for row in history]
             self.write(json.dumps(result))
@@ -109,8 +134,14 @@ class FetchHostsHandler(BaseHandler):
     async def get(self):
         try:
             with self.db.get_cursor() as cursor:
-                cursor.execute("SELECT hostname, alias, location FROM hosts")
-                hosts = cursor.fetchall()
+                try:
+                    cursor.execute("SELECT hostname, alias, location FROM hosts")
+                    hosts = cursor.fetchall()
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             result = [{"hostname": h['hostname'], "additional_data": {"alias": h['alias'], "location": h['location']}}
                       for h in hosts]
@@ -125,12 +156,18 @@ class AlertConfigHandler(BaseHandler):
     async def get(self):
         try:
             with self.db.get_cursor() as cursor:
-                cursor.execute("""
-                    SELECT a.id, h.hostname, a.metric_name, a.condition, a.threshold, a.duration, a.enabled
-                    FROM alerts a
-                    JOIN hosts h ON a.host_id = h.id
-                """)
-                alerts = cursor.fetchall()
+                try:
+                    cursor.execute("""
+                        SELECT a.id, h.hostname, a.metric_name, a.condition, a.threshold, a.duration, a.enabled
+                        FROM alerts a
+                        JOIN hosts h ON a.host_id = h.id
+                    """)
+                    alerts = cursor.fetchall()
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             result = [dict(a) for a in alerts]
             self.write(json.dumps(result))
@@ -143,20 +180,26 @@ class AlertConfigHandler(BaseHandler):
         try:
             data = json.loads(self.request.body)
             with self.db.get_cursor() as cursor:
-                cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (data['hostname'],))
-                host = cursor.fetchone()
-                if not host:
-                    self.set_status(404)
-                    self.write({"error": "Host not found"})
-                    return
+                try:
+                    cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (data['hostname'],))
+                    host = cursor.fetchone()
+                    if not host:
+                        self.set_status(404)
+                        self.write({"error": "Host not found"})
+                        return
 
-                cursor.execute("""
-                    INSERT INTO alerts (host_id, metric_name, condition, threshold, duration, enabled)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                """, (host['id'], data['metric_name'], data['condition'], data['threshold'], data['duration'], True))
-                alert_id = cursor.fetchone()['id']
-                self.db.conn.commit()
+                    cursor.execute("""
+                        INSERT INTO alerts (host_id, metric_name, condition, threshold, duration, enabled)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (
+                    host['id'], data['metric_name'], data['condition'], data['threshold'], data['duration'], True))
+                    alert_id = cursor.fetchone()['id']
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             self.write({"status": "success", "id": alert_id})
         except Exception as e:
@@ -168,12 +211,17 @@ class AlertConfigHandler(BaseHandler):
         try:
             data = json.loads(self.request.body)
             with self.db.get_cursor() as cursor:
-                cursor.execute("DELETE FROM alerts WHERE id = %s", (data['id'],))
-                if cursor.rowcount == 0:
-                    self.set_status(404)
-                    self.write({"error": "Alert not found"})
+                try:
+                    cursor.execute("DELETE FROM alerts WHERE id = %s", (data['id'],))
+                    if cursor.rowcount == 0:
+                        self.set_status(404)
+                        self.write({"error": "Alert not found"})
+                        return
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
                     return
-                self.db.conn.commit()
 
             self.write({"status": "success"})
         except Exception as e:
@@ -187,12 +235,17 @@ class AlertStateHandler(BaseHandler):
         try:
             data = json.loads(self.request.body)
             with self.db.get_cursor() as cursor:
-                cursor.execute("UPDATE alerts SET enabled = %s WHERE id = %s", (data['enabled'], data['id']))
-                if cursor.rowcount == 0:
-                    self.set_status(404)
-                    self.write({"error": "Alert not found"})
+                try:
+                    cursor.execute("UPDATE alerts SET enabled = %s WHERE id = %s", (data['enabled'], data['id']))
+                    if cursor.rowcount == 0:
+                        self.set_status(404)
+                        self.write({"error": "Alert not found"})
+                        return
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
                     return
-                self.db.conn.commit()
 
             self.write({"status": "success"})
         except Exception as e:
@@ -220,8 +273,14 @@ class DowntimeHandler(BaseHandler):
             query += " ORDER BY d.start_time DESC"
 
             with self.db.get_cursor() as cursor:
-                cursor.execute(query, params)
-                downtimes = cursor.fetchall()
+                try:
+                    cursor.execute(query, params)
+                    downtimes = cursor.fetchall()
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             result = [dict(d) for d in downtimes]
             self.write(json.dumps(result))
@@ -234,20 +293,25 @@ class DowntimeHandler(BaseHandler):
         try:
             data = json.loads(self.request.body)
             with self.db.get_cursor() as cursor:
-                cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (data['hostname'],))
-                host = cursor.fetchone()
-                if not host:
-                    self.set_status(404)
-                    self.write({"error": "Host not found"})
-                    return
+                try:
+                    cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (data['hostname'],))
+                    host = cursor.fetchone()
+                    if not host:
+                        self.set_status(404)
+                        self.write({"error": "Host not found"})
+                        return
 
-                cursor.execute("""
-                    INSERT INTO downtimes (host_id, start_time, end_time)
-                    VALUES (%s, %s, %s)
-                    RETURNING id
-                """, (host['id'], data['start_time'], data['end_time']))
-                downtime_id = cursor.fetchone()['id']
-                self.db.conn.commit()
+                    cursor.execute("""
+                        INSERT INTO downtimes (host_id, start_time, end_time)
+                        VALUES (%s, %s, %s)
+                        RETURNING id
+                    """, (host['id'], data['start_time'], data['end_time']))
+                    downtime_id = cursor.fetchone()['id']
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             self.write({"status": "success", "id": downtime_id})
         except Exception as e:
@@ -259,12 +323,17 @@ class DowntimeHandler(BaseHandler):
         try:
             data = json.loads(self.request.body)
             with self.db.get_cursor() as cursor:
-                cursor.execute("DELETE FROM downtimes WHERE id = %s", (data['id'],))
-                if cursor.rowcount == 0:
-                    self.set_status(404)
-                    self.write({"error": "Downtime not found"})
+                try:
+                    cursor.execute("DELETE FROM downtimes WHERE id = %s", (data['id'],))
+                    if cursor.rowcount == 0:
+                        self.set_status(404)
+                        self.write({"error": "Downtime not found"})
+                        return
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
                     return
-                self.db.conn.commit()
 
             self.write({"status": "success"})
         except Exception as e:
@@ -295,8 +364,14 @@ class RecentAlertsHandler(BaseHandler):
             params.append(limit)
 
             with self.db.get_cursor() as cursor:
-                cursor.execute(query, params)
-                recent_alerts = cursor.fetchall()
+                try:
+                    cursor.execute(query, params)
+                    recent_alerts = cursor.fetchall()
+                except Exception as e:
+                    logger.error(f"Database operation failed: {e}")
+                    self.set_status(500)
+                    self.write({"error": "Internal server error"})
+                    return
 
             result = [
                 {
@@ -338,9 +413,8 @@ class JSHandler(BaseHandler):
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
-
 class AggregateDataHandler(BaseHandler):
-    def get(self):
+    def post(self):
         try:
             aggregate_data()
             self.write({"status": "Data aggregation triggered successfully"})
