@@ -49,7 +49,7 @@ class MonitoringClient:
 
     def load_config(self):
         try:
-            with open('config_client.json', 'r') as config_file:
+            with open('client_config.json', 'r') as config_file:
                 return json.load(config_file)
         except FileNotFoundError:
             print("Config file not found. Using default configuration.")

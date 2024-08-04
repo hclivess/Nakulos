@@ -414,7 +414,7 @@ class JSHandler(BaseHandler):
             self.write({"error": "Internal server error"})
 
 class AggregateDataHandler(BaseHandler):
-    def post(self):
+    def get(self):
         try:
             aggregate_data()
             self.write({"status": "Data aggregation triggered successfully"})
