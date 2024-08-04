@@ -68,18 +68,20 @@ class MetricProcessor(QueueManager):
         metric_name = item['metric_name']
         value = item['value']
         timestamp = item['timestamp']
-        additional_data = item.get('additional_data', {}) #todo
+        additional_data = item.get('additional_data', {})
 
         logger.info(f"Processing metric: {hostname} - {metric_name}: {value}")
-
         with self.db.get_cursor() as cursor:
             try:
                 # Get or create host
-                cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (hostname,))
+                cursor.execute("""
+                    INSERT INTO hosts (hostname, alias, location)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (hostname) DO UPDATE
+                    SET alias = EXCLUDED.alias, location = EXCLUDED.location
+                    RETURNING id
+                """, (hostname, additional_data.get('alias'), additional_data.get('location')))
                 host = cursor.fetchone()
-                if not host:
-                    cursor.execute("INSERT INTO hosts (hostname) VALUES (%s) RETURNING id", (hostname,))
-                    host = cursor.fetchone()
 
                 host_id = host['id']
 
@@ -110,6 +112,7 @@ class MetricProcessor(QueueManager):
             except Exception as e:
                 logger.error(f"Error processing metric: {e}", exc_info=True)
                 self.db.conn.rollback()
+                raise
 
     def _check_alert_condition(self, alert, value):
         if alert['condition'] == 'above':
