@@ -98,13 +98,6 @@ async function initDashboard() {
     await updateDashboard('all');
     updateFormVisibility('all');
     setupAlertUpdates();
-
-    document.getElementById('downtimeForm').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        await addDowntime(event);
-        const hostname = document.querySelector('#hostSelector select').value;
-        await updateDowntimes(hostname);
-    });
 }
 
 function startDashboardUpdater() {

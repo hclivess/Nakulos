@@ -340,6 +340,7 @@ class DowntimeHandler(BaseHandler):
                     return
 
             self.write({"status": "success", "id": downtime_id})
+
         except Exception as e:
             logger.error(f"Error in DowntimeHandler POST: {str(e)}")
             self.set_status(500)
