@@ -1,4 +1,4 @@
-// alerts.js
+import { updateFormVisibility } from './utils.js';
 
 async function updateAlertConfigs(hostname) {
     try {
