@@ -20,23 +20,30 @@ async function updateDashboard(hostname) {
         document.getElementById('hostInfo').style.display = 'block';
         document.querySelector('.chart-container').style.display = 'block';
         const latestMetrics = await fetchLatestMetrics();
-        const metricNames = Object.keys(latestMetrics[hostname].metrics);
-        console.log('Metric names:', metricNames);
+        console.log('Latest metrics:', latestMetrics);
+        const hostData = latestMetrics[hostname];
+        if (hostData) {
+            const metricNames = Object.keys(hostData.metrics || {});
+            console.log('Metric names:', metricNames);
 
-        updateHostInfo(hostname, latestMetrics[hostname].additional_data);
+            updateHostInfo(hostname, hostData.tags || {});
 
-        const startDate = new Date(document.getElementById('startDate').value).getTime() / 1000;
-        const endDate = new Date(document.getElementById('endDate').value).getTime() / 1000;
-        const datasets = await Promise.all(metricNames.map(async (metricName) => {
-            const history = await fetchMetricHistory(hostname, metricName, startDate, endDate);
-            return {
-                label: metricName,
-                data: history.map(point => ({ x: new Date(point[0] * 1000), y: point[1] })),
-                fill: false
-            };
-        }));
+            const startDate = new Date(document.getElementById('startDate').value).getTime() / 1000;
+            const endDate = new Date(document.getElementById('endDate').value).getTime() / 1000;
+            const datasets = await Promise.all(metricNames.map(async (metricName) => {
+                const history = await fetchMetricHistory(hostname, metricName, startDate, endDate);
+                return {
+                    label: metricName,
+                    data: history.map(point => ({ x: new Date(point[0] * 1000), y: point[1] })),
+                    fill: false
+                };
+            }));
 
-        chart = await updateChart(chart, datasets);
+            chart = await updateChart(chart, datasets);
+        } else {
+            console.error(`No data found for hostname: ${hostname}`);
+            updateHostInfo(hostname, {});
+        }
     }
 
     await updateRecentAlerts(hostname);
@@ -45,6 +52,8 @@ async function updateDashboard(hostname) {
 }
 
 function createHostSelector(hosts) {
+    console.log('Hosts data received:', hosts);
+
     const selector = document.getElementById('hostSelector');
     selector.innerHTML = '<label for="hostSelect" class="form-label">Select Host:</label>';
     const select = document.createElement('select');
@@ -56,13 +65,17 @@ function createHostSelector(hosts) {
     allOption.textContent = 'All Hosts';
     select.appendChild(allOption);
 
-    hosts.forEach(host => {
-        const option = document.createElement('option');
-        option.value = host.hostname;
-        // Use the alias tag if available, otherwise use the hostname
-        option.textContent = host.tags && host.tags.alias ? host.tags.alias : host.hostname;
-        select.appendChild(option);
-    });
+    if (typeof hosts === 'object' && hosts !== null) {
+        Object.entries(hosts).forEach(([hostname, hostData]) => {
+            const option = document.createElement('option');
+            option.value = hostname;
+            option.textContent = hostData.tags && hostData.tags.alias ? hostData.tags.alias : hostname;
+            select.appendChild(option);
+        });
+    } else {
+        console.error('Unexpected hosts data format:', hosts);
+    }
+
     select.addEventListener('change', async () => {
         const selectedHostname = select.value;
         await updateDashboard(selectedHostname);
@@ -71,22 +84,26 @@ function createHostSelector(hosts) {
     selector.appendChild(select);
 }
 
-
 function updateHostInfo(hostname, tags) {
-    document.getElementById('hostInfoHostname').textContent = hostname;
-    const tagsList = document.getElementById('tagsList');
-    tagsList.innerHTML = '';
+    const hostInfoDiv = document.getElementById('hostInfo');
+    if (hostInfoDiv) {
+        let content = `<h3>Host Information</h3>
+                       <p><strong>Hostname: </strong>${hostname}</p>
+                       <h4>Tags:</h4>
+                       <ul>`;
 
-    if (tags && typeof tags === 'object') {
-        for (const [key, value] of Object.entries(tags)) {
-            const li = document.createElement('li');
-            li.textContent = `${key}: ${value}`;
-            tagsList.appendChild(li);
+        if (tags && typeof tags === 'object') {
+            for (const [key, value] of Object.entries(tags)) {
+                content += `<li>${key}: ${value}</li>`;
+            }
+        } else {
+            content += '<li>No tags available</li>';
         }
+
+        content += '</ul>';
+        hostInfoDiv.innerHTML = content;
     } else {
-        const li = document.createElement('li');
-        li.textContent = 'No tags available';
-        tagsList.appendChild(li);
+        console.warn("Element with id 'hostInfo' not found");
     }
 }
 
@@ -134,7 +151,9 @@ document.getElementById('downtimeForm').addEventListener('submit', async (event)
 });
 
 // Initialize the dashboard
-initDashboard();
-startDashboardUpdater();
+document.addEventListener('DOMContentLoaded', function() {
+    initDashboard();
+    startDashboardUpdater();
+});
 
 export { updateDashboard };

@@ -44,6 +44,8 @@ class MetricsHandler(BaseHandler):
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
+import json
+
 class FetchLatestHandler(BaseHandler):
     async def get(self):
         try:
@@ -64,7 +66,7 @@ class FetchLatestHandler(BaseHandler):
                 except Exception as e:
                     logger.error(f"Database operation failed: {e}")
                     self.set_status(500)
-                    self.write({"error": "Internal server error"})
+                    self.write(json.dumps({"error": "Internal server error"}))
                     return
 
             latest_metrics = {}
@@ -73,15 +75,17 @@ class FetchLatestHandler(BaseHandler):
                 if hostname not in latest_metrics:
                     latest_metrics[hostname] = {
                         'metrics': {},
-                        'tags': json.loads(row['tags']) if row['tags'] else {}
+                        'tags': row['tags'] if isinstance(row['tags'], dict) else {}
                     }
-                latest_metrics[hostname]['metrics'][row['metric_name']] = row['value']
+                latest_metrics[hostname]['metrics'][row['metric_name']] = float(row['value'])
+                latest_metrics[hostname]['metrics'][row['metric_name'] + '_timestamp'] = float(row['timestamp'])
 
+            self.set_header("Content-Type", "application/json")
             self.write(json.dumps(latest_metrics))
         except Exception as e:
             logger.error(f"Error in FetchLatestHandler: {str(e)}")
             self.set_status(500)
-            self.write({"error": "Internal server error"})
+            self.write(json.dumps({"error": "Internal server error"}))
 
 class FetchHistoryHandler(BaseHandler):
     async def get(self, hostname, metric_name):
@@ -162,16 +166,21 @@ class FetchHostsHandler(BaseHandler):
                 except Exception as e:
                     logger.error(f"Database operation failed: {e}")
                     self.set_status(500)
-                    self.write({"error": "Internal server error"})
+                    self.write(json.dumps({"error": "Internal server error"}))
                     return
 
-            result = [{"hostname": h['hostname'], "tags": json.loads(h['tags']) if h['tags'] else {}}
-                      for h in hosts]
+            result = {}
+            for host in hosts:
+                hostname = host['hostname']
+                tags = host['tags'] if isinstance(host['tags'], dict) else {}
+                result[hostname] = {"tags": tags}
+
+            self.set_header("Content-Type", "application/json")
             self.write(json.dumps(result))
         except Exception as e:
             logger.error(f"Error in FetchHostsHandler: {str(e)}")
             self.set_status(500)
-            self.write({"error": "Internal server error"})
+            self.write(json.dumps({"error": "Internal server error"}))
 
 class AlertConfigHandler(BaseHandler):
     async def get(self):

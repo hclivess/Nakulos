@@ -2,7 +2,7 @@
     "server_url": "http://localhost:8888",
     "interval": 1,
     "metrics_dir": "./metrics",
-    "additional_data": {
+    "tags": {
         "alias": "My Server",
         "location": "Data Center 1"
     }

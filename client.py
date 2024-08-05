@@ -55,7 +55,7 @@ class MonitoringClient:
         self.metrics_modules = self.load_metric_modules()
         self.metrics_store = MetricsStore()
         self.hostname = socket.gethostname()
-        self.additional_data = self.config.get('additional_data', {})
+        self.tags = self.config.get('tags', {})
         logger.info(f"MonitoringClient initialized with config: {self.config}")
 
     def load_config(self):
@@ -134,7 +134,7 @@ class MonitoringClient:
         data_to_send = {
             "hostname": self.hostname,
             "metrics": metrics_to_send,
-            "additional_data": self.additional_data
+            "tags": self.tags
         }
         logger.info(f"Preparing to send metrics: {data_to_send}")
         try:

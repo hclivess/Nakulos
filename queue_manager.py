@@ -70,6 +70,7 @@ class MetricProcessor(QueueManager):
         value = item['value']
         timestamp = item['timestamp']
         tags = item.get('tags', {})
+        print(tags)
 
         logger.info(f"Processing metric: {hostname} - {metric_name}: {value}")
         with self.db.get_cursor() as cursor:
