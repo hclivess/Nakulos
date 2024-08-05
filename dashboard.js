@@ -87,9 +87,8 @@ function createHostSelector(hosts) {
 function updateHostInfo(hostname, tags) {
     const hostInfoDiv = document.getElementById('hostInfo');
     if (hostInfoDiv) {
-        let content = `<h3>Host Information</h3>
-                       <p><strong>Hostname: </strong>${hostname}</p>
-                       <h4>Tags:</h4>
+        let content = `<p><strong>Hostname: </strong>${hostname}</p>
+                       <p><strong>Tags:</strong></p>
                        <ul>`;
 
         if (tags && typeof tags === 'object') {
