@@ -125,22 +125,22 @@ class MetricProcessor(QueueManager):
                 self.db.conn.rollback()
                 raise
 
-            def _check_alert_condition(self, alert, value):
-                if alert['condition'] == 'above':
-                    return value > alert['threshold']
-                elif alert['condition'] == 'below':
-                    return value < alert['threshold']
-                return False
+    def _check_alert_condition(self, alert, value):
+        if alert['condition'] == 'above':
+            return value > alert['threshold']
+        elif alert['condition'] == 'below':
+            return value < alert['threshold']
+        return False
 
-            def _trigger_alert(self, cursor, alert, hostname, metric_name, value, timestamp):
-                logger.info(f"Alert triggered for {hostname} - {metric_name}: {value}")
+    def _trigger_alert(self, cursor, alert, hostname, metric_name, value, timestamp):
+        logger.info(f"Alert triggered for {hostname} - {metric_name}: {value}")
 
-                try:
-                    cursor.execute(
-                        "INSERT INTO alert_history (host_id, alert_id, timestamp, value) VALUES (%s, %s, %s, %s)",
-                        (alert['host_id'], alert['id'], timestamp, value)
-                    )
-                    logger.info(
-                        f"Alert logged to database: alert_id={alert['id']}, host_id={alert['host_id']}, timestamp={timestamp}, value={value}")
-                except Exception as e:
-                    logger.error(f"Failed to log alert to database: {e}", exc_info=True)
+        try:
+            cursor.execute(
+                "INSERT INTO alert_history (host_id, alert_id, timestamp, value) VALUES (%s, %s, %s, %s)",
+                (alert['host_id'], alert['id'], timestamp, value)
+            )
+            logger.info(
+                f"Alert logged to database: alert_id={alert['id']}, host_id={alert['host_id']}, timestamp={timestamp}, value={value}")
+        except Exception as e:
+            logger.error(f"Failed to log alert to database: {e}", exc_info=True)
