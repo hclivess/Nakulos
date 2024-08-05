@@ -78,7 +78,7 @@ class FetchLatestHandler(BaseHandler):
                         'tags': row['tags'] if isinstance(row['tags'], dict) else {}
                     }
                 latest_metrics[hostname]['metrics'][row['metric_name']] = float(row['value'])
-                latest_metrics[hostname]['metrics'][row['metric_name'] + '_timestamp'] = float(row['timestamp'])
+                #latest_metrics[hostname]['metrics'][row['metric_name'] + '_timestamp'] = float(row['timestamp'])
 
             self.set_header("Content-Type", "application/json")
             self.write(json.dumps(latest_metrics))
