@@ -20,19 +20,27 @@
             <div class="col-md-3">
                 <label for="startDate" class="form-label">Start Date:</label>
                 <input type="datetime-local" class="form-control" id="startDate">
-                <button id="removeHostButton" class="btn btn-danger">Remove Selected Host</button>
             </div>
             <div class="col-md-3">
                 <label for="endDate" class="form-label">End Date:</label>
                 <input type="datetime-local" class="form-control" id="endDate">
             </div>
             <div class="col-md-3 d-flex align-items-end">
-                <button class="btn btn-primary me-2" onclick="updateDashboard()">Update</button>
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn btn-secondary" id="lastHourButton">Last Hour</button>
-                    <button type="button" class="btn btn-secondary" id="lastDayButton">Last Day</button>
-                    <button type="button" class="btn btn-secondary" id="lastWeekButton">Last Week</button>
-                    <button type="button" class="btn btn-secondary" id="lastMonthButton">Last Month</button>
+                <div class="btn-group me-2" role="group">
+                    <button class="btn btn-primary" onclick="updateDashboard()">Update</button>
+                    <button class="btn btn-danger" id="removeHostButton">Remove Host</button>
+                </div>
+
+                <div class="dropdown">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="timeRangeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        Time Range
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="timeRangeDropdown">
+                        <li><a class="dropdown-item" href="#" id="lastHourButton">Last Hour</a></li>
+                        <li><a class="dropdown-item" href="#" id="lastDayButton">Last Day</a></li>
+                        <li><a class="dropdown-item" href="#" id="lastWeekButton">Last Week</a></li>
+                        <li><a class="dropdown-item" href="#" id="lastMonthButton">Last Month</a></li>
+                    </ul>
                 </div>
             </div>
         </div>
