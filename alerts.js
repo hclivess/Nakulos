@@ -51,7 +51,9 @@ async function addAlertConfig(event) {
         if (response.ok) {
             console.log('Alert config added successfully');
             document.getElementById('alertForm').reset();
-            await updateAlertConfigs(document.querySelector('#hostSelector select').value);
+            const selectedHostname = document.querySelector('#hostSelector select').value;
+            updateFormVisibility(selectedHostname);
+            await updateAlertConfigs(selectedHostname);
         } else {
             const errorData = await response.json();
             console.error('Failed to add alert config:', errorData.error);

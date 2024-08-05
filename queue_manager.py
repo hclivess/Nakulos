@@ -70,7 +70,6 @@ class MetricProcessor(QueueManager):
         value = item['value']
         timestamp = item['timestamp']
         tags = item.get('tags', {})
-        print(tags)
 
         logger.info(f"Processing metric: {hostname} - {metric_name}: {value}")
         with self.db.get_cursor() as cursor:
@@ -93,22 +92,32 @@ class MetricProcessor(QueueManager):
                     (host_id, metric_name, timestamp, value)
                 )
 
-                # Check alerts
-                cursor.execute(
-                    "SELECT * FROM alerts WHERE host_id = %s AND metric_name = %s AND enabled = TRUE",
-                    (host_id, metric_name)
-                )
-                alerts = cursor.fetchall()
+                # Check if there's an active downtime
+                cursor.execute("""
+                    SELECT 1 FROM downtimes
+                    WHERE host_id = %s AND start_time <= %s AND end_time >= %s
+                """, (host_id, timestamp, timestamp))
+                is_downtime = cursor.fetchone() is not None
 
-                logger.info(f"Checking {len(alerts)} alerts for {hostname} - {metric_name}")
+                if not is_downtime:
+                    # Check alerts only if not in downtime
+                    cursor.execute(
+                        "SELECT * FROM alerts WHERE host_id = %s AND metric_name = %s AND enabled = TRUE",
+                        (host_id, metric_name)
+                    )
+                    alerts = cursor.fetchall()
 
-                for alert in alerts:
-                    logger.info(
-                        f"Checking alert: {alert['id']} - Condition: {alert['condition']}, Threshold: {alert['threshold']}")
-                    if self._check_alert_condition(alert, value):
-                        self._trigger_alert(cursor, alert, hostname, metric_name, value, timestamp)
-                    else:
-                        logger.info(f"Alert condition not met for alert {alert['id']}")
+                    logger.info(f"Checking {len(alerts)} alerts for {hostname} - {metric_name}")
+
+                    for alert in alerts:
+                        logger.info(
+                            f"Checking alert: {alert['id']} - Condition: {alert['condition']}, Threshold: {alert['threshold']}")
+                        if self._check_alert_condition(alert, value):
+                            self._trigger_alert(cursor, alert, hostname, metric_name, value, timestamp)
+                        else:
+                            logger.info(f"Alert condition not met for alert {alert['id']}")
+                else:
+                    logger.info(f"Skipping alert checks for {hostname} due to active downtime")
 
                 self.db.conn.commit()
             except Exception as e:
@@ -116,22 +125,22 @@ class MetricProcessor(QueueManager):
                 self.db.conn.rollback()
                 raise
 
-    def _check_alert_condition(self, alert, value):
-        if alert['condition'] == 'above':
-            return value > alert['threshold']
-        elif alert['condition'] == 'below':
-            return value < alert['threshold']
-        return False
+            def _check_alert_condition(self, alert, value):
+                if alert['condition'] == 'above':
+                    return value > alert['threshold']
+                elif alert['condition'] == 'below':
+                    return value < alert['threshold']
+                return False
 
-    def _trigger_alert(self, cursor, alert, hostname, metric_name, value, timestamp):
-        logger.info(f"Alert triggered for {hostname} - {metric_name}: {value}")
+            def _trigger_alert(self, cursor, alert, hostname, metric_name, value, timestamp):
+                logger.info(f"Alert triggered for {hostname} - {metric_name}: {value}")
 
-        try:
-            cursor.execute(
-                "INSERT INTO alert_history (host_id, alert_id, timestamp, value) VALUES (%s, %s, %s, %s)",
-                (alert['host_id'], alert['id'], timestamp, value)
-            )
-            logger.info(
-                f"Alert logged to database: alert_id={alert['id']}, host_id={alert['host_id']}, timestamp={timestamp}, value={value}")
-        except Exception as e:
-            logger.error(f"Failed to log alert to database: {e}", exc_info=True)
+                try:
+                    cursor.execute(
+                        "INSERT INTO alert_history (host_id, alert_id, timestamp, value) VALUES (%s, %s, %s, %s)",
+                        (alert['host_id'], alert['id'], timestamp, value)
+                    )
+                    logger.info(
+                        f"Alert logged to database: alert_id={alert['id']}, host_id={alert['host_id']}, timestamp={timestamp}, value={value}")
+                except Exception as e:
+                    logger.error(f"Failed to log alert to database: {e}", exc_info=True)
