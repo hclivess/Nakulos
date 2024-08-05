@@ -2,7 +2,7 @@ import tornado.web
 from handlers import (MainHandler, MetricsHandler, FetchLatestHandler,
                       FetchHistoryHandler, FetchHostsHandler, AlertConfigHandler,
                       AlertStateHandler, DowntimeHandler, RecentAlertsHandler,
-                      DashboardHandler, JSHandler, AggregateDataHandler)
+                      DashboardHandler, JSHandler, AggregateDataHandler, RemoveHostHandler)
 
 def make_app(metric_processor):
     return tornado.web.Application([
@@ -22,5 +22,6 @@ def make_app(metric_processor):
         (r"/downtimes.js", JSHandler, {"filename": "downtimes.js"}),
         (r"/utils.js", JSHandler, {"filename": "utils.js"}),
         (r"/aggregate", AggregateDataHandler),
+        (r"/remove_host", RemoveHostHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"}),
     ])

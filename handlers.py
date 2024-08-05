@@ -477,3 +477,36 @@ class AggregateDataHandler(BaseHandler):
             logger.error(f"Error in AggregateDataHandler: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
+
+
+class RemoveHostHandler(BaseHandler):
+        async def post(self):
+            try:
+                data = json.loads(self.request.body)
+                hostname = data.get('hostname')
+
+                if not hostname:
+                    self.set_status(400)
+                    self.write(json.dumps({"error": "Hostname is required"}))
+                    return
+
+                with self.db.get_cursor() as cursor:
+                    cursor.execute("BEGIN")
+                    try:
+                        cursor.execute("DELETE FROM hosts WHERE hostname = %s", (hostname,))
+                        if cursor.rowcount == 0:
+                            cursor.execute("ROLLBACK")
+                            self.set_status(404)
+                            self.write(json.dumps({"error": "Host not found"}))
+                        else:
+                            cursor.execute("COMMIT")
+                            self.write(
+                                json.dumps({"status": "success", "message": f"Host {hostname} removed successfully"}))
+                    except Exception as e:
+                        cursor.execute("ROLLBACK")
+                        raise e
+
+            except Exception as e:
+                logger.error(f"Error in RemoveHostHandler: {str(e)}")
+                self.set_status(500)
+                self.write(json.dumps({"error": "Internal server error"}))

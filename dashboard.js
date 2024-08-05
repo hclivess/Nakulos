@@ -117,6 +117,41 @@ function setupTimeRangeButtons() {
     });
 }
 
+async function removeSelectedHost() {
+    const selectedHostname = document.querySelector('#hostSelector select').value;
+    if (selectedHostname === 'all') {
+        alert('Please select a specific host to remove.');
+        return;
+    }
+
+    if (confirm(`Are you sure you want to remove the host "${selectedHostname}"? This action cannot be undone.`)) {
+        try {
+            const response = await fetch('/remove_host', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ hostname: selectedHostname }),
+            });
+
+            if (response.ok) {
+                alert(`Host "${selectedHostname}" has been removed successfully.`);
+                // Refresh the host list and update the dashboard
+                const hosts = await fetchHosts();
+                createHostSelector(hosts);
+                await updateDashboard('all');
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to remove host: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error('Error removing host:', error);
+            alert('An error occurred while trying to remove the host. Please try again.');
+        }
+    }
+}
+
+
 async function initDashboard() {
     const hosts = await fetchHosts();
     createHostSelector(hosts);
@@ -125,6 +160,7 @@ async function initDashboard() {
     await updateDashboard('all');
     updateFormVisibility('all');
     setupAlertUpdates();
+    document.getElementById('removeHostButton').addEventListener('click', removeSelectedHost);
 }
 
 function startDashboardUpdater() {
@@ -135,6 +171,7 @@ function startDashboardUpdater() {
 }
 
 // Event listeners
+
 document.getElementById('alertForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     await addAlertConfig(event);
