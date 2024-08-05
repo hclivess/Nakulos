@@ -7,16 +7,13 @@ from data_aggregator import aggregate_data
 
 logger = logging.getLogger(__name__)
 
-
 class BaseHandler(tornado.web.RequestHandler):
     def initialize(self):
         self.db = get_db()
 
-
 class MainHandler(BaseHandler):
     def get(self):
         self.write("Monitoring Server is running")
-
 
 class MetricsHandler(BaseHandler):
     def initialize(self, metric_processor):
@@ -29,7 +26,7 @@ class MetricsHandler(BaseHandler):
             hostname = data['hostname']
             metrics = data['metrics']
             timestamp = time.time()
-            additional_data = data.get('additional_data', {})
+            tags = data.get('tags', {})
 
             for metric_name, value in metrics.items():
                 metric_data = {
@@ -37,7 +34,7 @@ class MetricsHandler(BaseHandler):
                     'metric_name': metric_name,
                     'value': value,
                     'timestamp': timestamp,
-                    'additional_data': additional_data
+                    'tags': tags
                 }
                 self.metric_processor.enqueue_metric(metric_data)
 
@@ -47,14 +44,13 @@ class MetricsHandler(BaseHandler):
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
-
 class FetchLatestHandler(BaseHandler):
     async def get(self):
         try:
             with self.db.get_cursor() as cursor:
                 try:
                     cursor.execute("""
-                        SELECT h.hostname, m.metric_name, m.timestamp, m.value, h.alias, h.location
+                        SELECT h.hostname, m.metric_name, m.timestamp, m.value, h.tags
                         FROM metrics m
                         JOIN hosts h ON m.host_id = h.id
                         WHERE (h.id, m.metric_name, m.timestamp) IN (
@@ -77,7 +73,7 @@ class FetchLatestHandler(BaseHandler):
                 if hostname not in latest_metrics:
                     latest_metrics[hostname] = {
                         'metrics': {},
-                        'additional_data': {'alias': row['alias'], 'location': row['location']}
+                        'tags': json.loads(row['tags']) if row['tags'] else {}
                     }
                 latest_metrics[hostname]['metrics'][row['metric_name']] = row['value']
 
@@ -86,7 +82,6 @@ class FetchLatestHandler(BaseHandler):
             logger.error(f"Error in FetchLatestHandler: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
-
 
 class FetchHistoryHandler(BaseHandler):
     async def get(self, hostname, metric_name):
@@ -157,13 +152,12 @@ class FetchHistoryHandler(BaseHandler):
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
-
 class FetchHostsHandler(BaseHandler):
     async def get(self):
         try:
             with self.db.get_cursor() as cursor:
                 try:
-                    cursor.execute("SELECT hostname, alias, location FROM hosts")
+                    cursor.execute("SELECT hostname, tags FROM hosts")
                     hosts = cursor.fetchall()
                 except Exception as e:
                     logger.error(f"Database operation failed: {e}")
@@ -171,14 +165,13 @@ class FetchHostsHandler(BaseHandler):
                     self.write({"error": "Internal server error"})
                     return
 
-            result = [{"hostname": h['hostname'], "additional_data": {"alias": h['alias'], "location": h['location']}}
+            result = [{"hostname": h['hostname'], "tags": json.loads(h['tags']) if h['tags'] else {}}
                       for h in hosts]
             self.write(json.dumps(result))
         except Exception as e:
             logger.error(f"Error in FetchHostsHandler: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
-
 
 class AlertConfigHandler(BaseHandler):
     async def get(self):
@@ -220,8 +213,7 @@ class AlertConfigHandler(BaseHandler):
                         INSERT INTO alerts (host_id, metric_name, condition, threshold, duration, enabled)
                         VALUES (%s, %s, %s, %s, %s, %s)
                         RETURNING id
-                    """, (
-                    host['id'], data['metric_name'], data['condition'], data['threshold'], data['duration'], True))
+                    """, (host['id'], data['metric_name'], data['condition'], data['threshold'], data['duration'], True))
                     alert_id = cursor.fetchone()['id']
                 except Exception as e:
                     logger.error(f"Database operation failed: {e}")
@@ -257,7 +249,6 @@ class AlertConfigHandler(BaseHandler):
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
-
 class AlertStateHandler(BaseHandler):
     async def post(self):
         try:
@@ -280,7 +271,6 @@ class AlertStateHandler(BaseHandler):
             logger.error(f"Error in AlertStateHandler: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
-
 
 class DowntimeHandler(BaseHandler):
     async def get(self):
@@ -391,9 +381,6 @@ class DowntimeHandler(BaseHandler):
             self.write({"error": "Internal server error"})
 
 class RecentAlertsHandler(BaseHandler):
-    def initialize(self):
-        self.db = get_db()
-
     async def get(self):
         try:
             hostname = self.get_argument('hostname', None)
@@ -447,7 +434,6 @@ class RecentAlertsHandler(BaseHandler):
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
-
 class DashboardHandler(BaseHandler):
     def get(self):
         try:
@@ -457,7 +443,6 @@ class DashboardHandler(BaseHandler):
             logger.error(f"Error in DashboardHandler: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
-
 
 class JSHandler(BaseHandler):
     def initialize(self, filename):

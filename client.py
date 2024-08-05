@@ -56,7 +56,6 @@ class MonitoringClient:
         self.metrics_store = MetricsStore()
         self.hostname = socket.gethostname()
         self.additional_data = self.config.get('additional_data', {})
-        self.start_time = datetime.datetime.strptime(self.config['start_time'], "%H:%M:%S").time()
         logger.info(f"MonitoringClient initialized with config: {self.config}")
 
     def load_config(self):
@@ -108,22 +107,25 @@ class MonitoringClient:
 
     async def run(self):
         while True:
-            now = datetime.datetime.now()
-            next_run = datetime.datetime.combine(now.date(), self.start_time)
-            if now.time() > self.start_time:
-                next_run += datetime.timedelta(days=1)
+            # Calculate the next run time
+            now = time.time()
+            fraction_of_second = now % 1
+            time_to_next_second = 1 - fraction_of_second
 
-            await asyncio.sleep((next_run - now).total_seconds())
+            # Wait until the start of the next second
+            await asyncio.sleep(time_to_next_second)
 
-            while True:
-                start_time = time.time()
-                await self.send_metrics_once()
-                elapsed_time = time.time() - start_time
-                sleep_time = self.interval - elapsed_time
-                if sleep_time > 0:
-                    await asyncio.sleep(sleep_time)
-                else:
-                    logger.warning(f"Metric collection took longer than interval: {elapsed_time:.2f} seconds")
+            # Collect and send metrics
+            start_time = time.time()
+            await self.send_metrics_once()
+
+            # Calculate sleep time for the next interval
+            elapsed_time = time.time() - start_time
+            sleep_time = self.interval - elapsed_time
+            if sleep_time > 0:
+                await asyncio.sleep(sleep_time)
+            else:
+                logger.warning(f"Metric collection took longer than interval: {elapsed_time:.2f} seconds")
 
     async def send_metrics_once(self):
         self.collect_metrics()

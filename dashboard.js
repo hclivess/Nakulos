@@ -59,7 +59,8 @@ function createHostSelector(hosts) {
     hosts.forEach(host => {
         const option = document.createElement('option');
         option.value = host.hostname;
-        option.textContent = host.additional_data.alias || host.hostname;
+        // Use the alias tag if available, otherwise use the hostname
+        option.textContent = host.tags && host.tags.alias ? host.tags.alias : host.hostname;
         select.appendChild(option);
     });
     select.addEventListener('change', async () => {
@@ -71,13 +72,22 @@ function createHostSelector(hosts) {
 }
 
 
-function updateHostInfo(hostname, additionalData) {
-    const hostInfo = document.getElementById('hostInfo');
-    hostInfo.innerHTML = `
-        <strong>Hostname:</strong> ${hostname}<br>
-        <strong>Alias:</strong> ${additionalData.alias || 'N/A'}<br>
-        <strong>Location:</strong> ${additionalData.location || 'N/A'}
-    `;
+function updateHostInfo(hostname, tags) {
+    document.getElementById('hostInfoHostname').textContent = hostname;
+    const tagsList = document.getElementById('tagsList');
+    tagsList.innerHTML = '';
+
+    if (tags && typeof tags === 'object') {
+        for (const [key, value] of Object.entries(tags)) {
+            const li = document.createElement('li');
+            li.textContent = `${key}: ${value}`;
+            tagsList.appendChild(li);
+        }
+    } else {
+        const li = document.createElement('li');
+        li.textContent = 'No tags available';
+        tagsList.appendChild(li);
+    }
 }
 
 function setupTimeRangeButtons() {

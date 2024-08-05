@@ -93,8 +93,7 @@ def init_db(config):
             CREATE TABLE IF NOT EXISTS hosts (
                 id SERIAL PRIMARY KEY,
                 hostname VARCHAR(255) UNIQUE NOT NULL,
-                alias VARCHAR(255),
-                location VARCHAR(255)
+                tags JSONB
             )
         ''')
         cursor.execute('''

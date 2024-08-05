@@ -4,6 +4,7 @@ import queue
 import threading
 import time
 import logging
+import json
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -68,19 +69,19 @@ class MetricProcessor(QueueManager):
         metric_name = item['metric_name']
         value = item['value']
         timestamp = item['timestamp']
-        additional_data = item.get('additional_data', {})
+        tags = item.get('tags', {})
 
         logger.info(f"Processing metric: {hostname} - {metric_name}: {value}")
         with self.db.get_cursor() as cursor:
             try:
                 # Get or create host
                 cursor.execute("""
-                    INSERT INTO hosts (hostname, alias, location)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO hosts (hostname, tags)
+                    VALUES (%s, %s)
                     ON CONFLICT (hostname) DO UPDATE
-                    SET alias = EXCLUDED.alias, location = EXCLUDED.location
+                    SET tags = EXCLUDED.tags
                     RETURNING id
-                """, (hostname, additional_data.get('alias'), additional_data.get('location')))
+                """, (hostname, json.dumps(tags)))
                 host = cursor.fetchone()
 
                 host_id = host['id']
