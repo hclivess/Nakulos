@@ -88,18 +88,17 @@ function updateHostInfo(hostname, tags) {
     const hostInfoDiv = document.getElementById('hostInfo');
     if (hostInfoDiv) {
         let content = `<p><strong>Hostname: </strong>${hostname}</p>
-                       <p><strong>Tags:</strong></p>
-                       <ul>`;
+                       <div class="d-flex flex-wrap gap-2">`;
 
-        if (tags && typeof tags === 'object') {
+        if (tags && typeof tags === 'object' && Object.keys(tags).length > 0) {
             for (const [key, value] of Object.entries(tags)) {
-                content += `<li>${key}: ${value}</li>`;
+                content += `<span class="badge bg-secondary">${key}: ${value}</span>`;
             }
         } else {
-            content += '<li>No tags available</li>';
+            content += '<span class="badge bg-secondary">No tags</span>';
         }
 
-        content += '</ul>';
+        content += '</div>';
         hostInfoDiv.innerHTML = content;
     } else {
         console.warn("Element with id 'hostInfo' not found");
