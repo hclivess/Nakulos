@@ -1,5 +1,5 @@
-function initChart(datasets) {
-    const ctx = document.getElementById('metricsChart').getContext('2d');
+function initChart(metric, datasets) {
+    const ctx = document.getElementById(`${metric}Chart`).getContext('2d');
     return new Chart(ctx, {
         type: 'line',
         data: { datasets },
@@ -11,6 +11,10 @@ function initChart(datasets) {
                     title: {
                         display: true,
                         text: 'Time'
+                    },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 20
                     }
                 },
                 y: {
@@ -18,16 +22,32 @@ function initChart(datasets) {
                     title: {
                         display: true,
                         text: 'Value'
+                    },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 10
                     }
                 }
             },
             plugins: {
                 title: {
                     display: true,
-                    text: 'Metrics Over Time'
+                    text: `${metric} Over Time`
                 },
                 legend: {
                     position: 'top',
+                    labels: {
+                        boxWidth: 20,
+                        boxHeight: 2
+                    }
+                }
+            },
+            layout: {
+                padding: {
+                    top: 20,
+                    bottom: 20,
+                    left: 20,
+                    right: 20
                 }
             },
             responsive: true,
@@ -36,12 +56,12 @@ function initChart(datasets) {
     });
 }
 
-function updateChart(existingChart, datasets, startDate, endDate) {
+function updateChart(existingChart, metric, datasets, startDate, endDate) {
     if (existingChart) {
         existingChart.destroy();
     }
 
-    const ctx = document.getElementById('metricsChart').getContext('2d');
+    const ctx = document.getElementById(`${metric}Chart`).getContext('2d');
     return new Chart(ctx, {
         type: 'line',
         data: { datasets },
@@ -55,28 +75,48 @@ function updateChart(existingChart, datasets, startDate, endDate) {
                         text: 'Time'
                     },
                     min: startDate,
-                    max: endDate
+                    max: endDate,
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 20
+                    }
                 },
                 y: {
                     beginAtZero: true,
                     title: {
                         display: true,
                         text: 'Value'
+                    },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 10
                     }
                 }
             },
             plugins: {
                 title: {
                     display: true,
-                    text: 'Metrics Over Time'
+                    text: `${metric} Over Time`
                 },
                 legend: {
                     position: 'top',
+                    labels: {
+                        boxWidth: 20,
+                        boxHeight: 2
+                    }
+                }
+            },
+            layout: {
+                padding: {
+                    top: 20,
+                    bottom: 20,
+                    left: 20,
+                    right: 20
                 }
             },
             responsive: true,
             maintainAspectRatio: false,
-            spanGaps: true // This will connect points across gaps
+            spanGaps: true
         }
     });
 }

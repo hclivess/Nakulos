@@ -105,49 +105,84 @@ async function removeSelectedHost() {
 }
 
 async function updateDashboard(hostname) {
-    console.log('Updating dashboard...');
-    console.log('Selected hostname:', hostname);
+  console.log('Updating dashboard...');
+  console.log('Selected hostname:', hostname);
 
-    if (hostname === 'all') {
-        document.getElementById('hostInfo').style.display = 'none';
-        document.querySelector('.chart-container').style.display = 'none';
-        if (chart) {
-            chart.destroy();
-            chart = null;
+  let charts = {};
+
+  if (hostname === 'all') {
+    document.getElementById('hostInfo').style.display = 'none';
+    document.getElementById('chartContainer').innerHTML = '';
+    Object.values(charts).forEach(chart => chart.destroy());
+  } else {
+    document.getElementById('hostInfo').style.display = 'block';
+    const latestMetrics = await fetchLatestMetrics();
+    console.log('Latest metrics:', latestMetrics);
+    const hostData = latestMetrics[hostname];
+    if (hostData) {
+      const metricNames = Object.keys(hostData.metrics || {});
+      console.log('Metric names:', metricNames);
+
+      updateHostInfo(hostname, hostData.tags || {});
+
+      const startDate = new Date(document.getElementById('startDate').value);
+      const endDate = new Date(document.getElementById('endDate').value);
+
+      const chartContainer = document.getElementById('chartContainer');
+      chartContainer.innerHTML = '';
+
+      const datasets = {};
+      const fetchPromises = metricNames.map(async (metric) => {
+        const metricData = await fetchMetricHistory(hostname, metric, startDate.getTime() / 1000, endDate.getTime() / 1000);
+        const data = metricData.map(point => ({ x: new Date(point[0] * 1000), y: point[1] }));
+        datasets[metric] = {
+          label: metric,
+          data: data,
+          borderColor: getRandomColor(),
+          fill: false
+        };
+      });
+
+      await Promise.all(fetchPromises);
+
+      for (const metric of metricNames) {
+        const chartDiv = document.createElement('div');
+        chartDiv.className = 'col-12';
+        chartDiv.style.height = '400px'; // Set a fixed height for the chart container
+        chartDiv.innerHTML = `<canvas id="${metric}Chart"></canvas>`;
+        chartContainer.appendChild(chartDiv);
+      }
+
+      // Delay the chart initialization/update to ensure canvas elements are available
+      setTimeout(() => {
+        for (const metric of metricNames) {
+          if (charts[metric]) {
+            charts[metric] = updateChart(charts[metric], metric, [datasets[metric]], startDate, endDate);
+          } else {
+            charts[metric] = initChart(metric, [datasets[metric]]);
+          }
         }
+      }, 100); // Adjust the delay as needed
     } else {
-        document.getElementById('hostInfo').style.display = 'block';
-        document.querySelector('.chart-container').style.display = 'block';
-        const latestMetrics = await fetchLatestMetrics();
-        console.log('Latest metrics:', latestMetrics);
-        const hostData = latestMetrics[hostname];
-        if (hostData) {
-            const metricNames = Object.keys(hostData.metrics || {});
-            console.log('Metric names:', metricNames);
-
-            updateHostInfo(hostname, hostData.tags || {});
-
-            const startDate = new Date(document.getElementById('startDate').value);
-            const endDate = new Date(document.getElementById('endDate').value);
-            const datasets = await Promise.all(metricNames.map(async (metricName) => {
-                const history = await fetchMetricHistory(hostname, metricName, startDate.getTime() / 1000, endDate.getTime() / 1000);
-                return {
-                    label: metricName,
-                    data: history.map(point => ({ x: new Date(point[0] * 1000), y: point[1] })),
-                    fill: false
-                };
-            }));
-
-            chart = await updateChart(chart, datasets, startDate, endDate);
-        } else {
-            console.error(`No data found for hostname: ${hostname}`);
-            updateHostInfo(hostname, {});
-        }
+      console.error(`No data found for hostname: ${hostname}`);
+      updateHostInfo(hostname, {});
+      document.getElementById('chartContainer').innerHTML = '';
+      Object.values(charts).forEach(chart => chart.destroy());
     }
+  }
 
-    await updateRecentAlerts(hostname);
-    await updateDowntimes(hostname);
-    await updateAlertConfigs(hostname);
+  await updateRecentAlerts(hostname);
+  await updateDowntimes(hostname);
+  await updateAlertConfigs(hostname);
+}
+
+function getRandomColor() {
+  const letters = '0123456789ABCDEF';
+  let color = '#';
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
 }
 
 function initDashboard() {
