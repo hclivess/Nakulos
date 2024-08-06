@@ -1,26 +1,11 @@
 {
-    "client_id": "unique_client_001",
-    "server_url": "http://localhost:8888",
-    "interval": 60,
-    "metrics_dir": "./metrics",
     "tags": {
         "role": "web_server",
         "location": "data_center_1",
         "environment": "production"
     },
-    "metrics": [
-        {
-            "name": "cpu_usage",
-            "module": "cpu_metric"
-        },
-        {
-            "name": "memory_usage",
-            "module": "memory_metric"
-        },
-        {
-            "name": "disk_usage",
-            "module": "disk_metric"
-        }
-    ],
-    "last_update": "0"
+    "interval": 60,
+    "metrics_dir": "./metrics",
+    "client_id": "84d629f2-87f2-4eaa-8e5d-39f05708d357",
+    "server_url": "http://localhost:8888"
 }

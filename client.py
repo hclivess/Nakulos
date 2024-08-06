@@ -1,3 +1,4 @@
+import uuid
 import socket
 import tornado.ioloop
 import tornado.httpclient
@@ -65,29 +66,45 @@ class MonitoringClient:
             with open('client_config.json', 'r') as config_file:
                 config = json.load(config_file)
                 logger.info(f"Loaded config: {config}")
+
+                # Check if client_id is not defined or empty
+                if not config.get('client_id'):
+                    # Generate a new client_id using UUID
+                    new_client_id = str(uuid.uuid4())
+                    config['client_id'] = new_client_id
+
+                    # Save the updated config with the new client_id
+                    self.save_config(config)
+
+                    logger.info(f"Generated new client_id: {new_client_id}")
+
                 return config
         except FileNotFoundError:
             logger.error("Config file not found. Using default configuration.")
-            return {
+            default_config = {
                 "server_url": "http://localhost:8888",
                 "interval": 60,
                 "metrics_dir": "./metrics",
-                "client_id": socket.gethostname(),
+                "client_id": str(uuid.uuid4()),  # Generate a new client_id
                 "last_update": "0"
             }
+            self.save_config(default_config)
+            return default_config
         except json.JSONDecodeError:
             logger.error("Invalid JSON in config file. Using default configuration.")
-            return {
+            default_config = {
                 "server_url": "http://localhost:8888",
                 "interval": 60,
                 "metrics_dir": "./metrics",
-                "client_id": socket.gethostname(),
+                "client_id": str(uuid.uuid4()),  # Generate a new client_id
                 "last_update": "0"
             }
+            self.save_config(default_config)
+            return default_config
 
-    def save_config(self):
+    def save_config(self, config):
         with open('client_config.json', 'w') as config_file:
-            json.dump(self.config, config_file, indent=4)
+            json.dump(config, config_file, indent=4)
         logger.info("Saved new configuration to client_config.json")
 
     def load_metric_modules(self):
@@ -185,7 +202,7 @@ class MonitoringClient:
         if self.metrics_dir != self.config.get('metrics_dir'):
             self.metrics_modules = self.load_metric_modules()
 
-        self.save_config()
+        self.save_config(new_config)
         logger.info("Applied new configuration")
 
     async def run(self):
