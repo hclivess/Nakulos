@@ -7,9 +7,9 @@ import importlib.util
 import os
 import time
 import logging
-import datetime
 import asyncio
 import sys
+import sqlite3
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -49,6 +49,50 @@ class MetricsStore:
         return {name: metric.get_latest() for name, metric in self.metrics.items()}
 
 
+class MetricBuffer:
+    def __init__(self, buffer_size=1000, db_path='metric_buffer.db'):
+        self.buffer_size = buffer_size
+        self.db_path = db_path
+        self.conn = sqlite3.connect(self.db_path)
+        self.create_table()
+
+    def create_table(self):
+        with self.conn:
+            self.conn.execute('''
+                CREATE TABLE IF NOT EXISTS metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    data TEXT NOT NULL,
+                    timestamp REAL NOT NULL
+                )
+            ''')
+
+    def add(self, data):
+        with self.conn:
+            self.conn.execute('INSERT INTO metrics (data, timestamp) VALUES (?, ?)',
+                              (json.dumps(data), time.time()))
+        self.trim_buffer()
+
+    def get_all(self):
+        with self.conn:
+            cursor = self.conn.execute('SELECT id, data, timestamp FROM metrics ORDER BY timestamp')
+            return cursor.fetchall()
+
+    def remove(self, ids):
+        with self.conn:
+            self.conn.executemany('DELETE FROM metrics WHERE id = ?', [(id,) for id in ids])
+
+    def trim_buffer(self):
+        with self.conn:
+            count = self.conn.execute('SELECT COUNT(*) FROM metrics').fetchone()[0]
+            if count > self.buffer_size:
+                excess = count - self.buffer_size
+                self.conn.execute(
+                    f'DELETE FROM metrics WHERE id IN (SELECT id FROM metrics ORDER BY timestamp LIMIT {excess})')
+
+    def close(self):
+        self.conn.close()
+
+
 class MonitoringClient:
     def __init__(self):
         self.config = self.load_config()
@@ -60,35 +104,10 @@ class MonitoringClient:
         self.client_id = self.config.get('client_id', self.hostname)
         self.tags = self.config.get('tags', {})
         self.last_update = self.config.get('last_update', '0')
+        self.metric_buffer = MetricBuffer()
+        self.max_retries = 5
+        self.retry_delay = 5  # seconds
         logger.info(f"MonitoringClient initialized with config: {self.config}")
-
-    async def fetch_new_metrics(self):
-        try:
-            client = tornado.httpclient.AsyncHTTPClient()
-            url = f"{self.server_url}/fetch_metrics?client_id={self.client_id}"
-            response = await client.fetch(url, method="GET")
-
-            if response.code == 200:
-                new_metrics = json.loads(response.body)
-                for metric_name, metric_code in new_metrics.items():
-                    self.update_metric_script(metric_name, metric_code)
-            else:
-                logger.error(f"Failed to fetch new metrics. Status code: {response.code}")
-        except Exception as e:
-            logger.error(f"Error fetching new metrics: {e}")
-
-    def update_metric_script(self, metric_name, metric_code):
-        file_path = os.path.join(self.config['metrics_dir'], f"{metric_name}.py")
-        with open(file_path, 'w') as f:
-            f.write(metric_code)
-
-        # Reload the module if it's already loaded
-        if metric_name in sys.modules:
-            spec = importlib.util.spec_from_file_location(metric_name, file_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            sys.modules[metric_name] = module
-            self.metrics_modules[metric_name] = module
 
     def load_config(self):
         try:
@@ -96,15 +115,10 @@ class MonitoringClient:
                 config = json.load(config_file)
                 logger.info(f"Loaded config: {config}")
 
-                # Check if client_id is not defined or empty
                 if not config.get('client_id'):
-                    # Generate a new client_id using UUID
                     new_client_id = str(uuid.uuid4())
                     config['client_id'] = new_client_id
-
-                    # Save the updated config with the new client_id
                     self.save_config(config)
-
                     logger.info(f"Generated new client_id: {new_client_id}")
 
                 return config
@@ -114,7 +128,7 @@ class MonitoringClient:
                 "server_url": "http://localhost:8888",
                 "interval": 60,
                 "metrics_dir": "./metrics",
-                "client_id": str(uuid.uuid4()),  # Generate a new client_id
+                "client_id": str(uuid.uuid4()),
                 "last_update": "0"
             }
             self.save_config(default_config)
@@ -125,7 +139,7 @@ class MonitoringClient:
                 "server_url": "http://localhost:8888",
                 "interval": 60,
                 "metrics_dir": "./metrics",
-                "client_id": str(uuid.uuid4()),  # Generate a new client_id
+                "client_id": str(uuid.uuid4()),
                 "last_update": "0"
             }
             self.save_config(default_config)
@@ -217,54 +231,56 @@ class MonitoringClient:
             logger.error(f"Error registering client: {e}", exc_info=True)
 
     def apply_new_config(self, new_config):
-        # Preserve important fields
         preserved_fields = ['client_id', 'server_url']
         for field in preserved_fields:
             if field not in new_config and field in self.config:
                 new_config[field] = self.config[field]
 
-        # Update the configuration
         self.config.update(new_config)
 
-        # Apply the updated configuration
         self.interval = self.config.get('interval', 60)
         self.metrics_dir = self.config.get('metrics_dir', './metrics')
         self.tags = self.config.get('tags', {})
         self.last_update = self.config.get('last_update', str(int(time.time())))
 
-        # Reload metric modules if metrics_dir has changed
         if self.metrics_dir != self.config.get('metrics_dir'):
             self.metrics_modules = self.load_metric_modules()
 
         self.save_config(new_config)
         logger.info("Applied new configuration")
 
-    async def run(self):
-        while True:
-            now = time.time()
-            fraction_of_second = now % 1
-            time_to_next_second = 1 - fraction_of_second
+    async def fetch_new_metrics(self):
+        try:
+            client = tornado.httpclient.AsyncHTTPClient()
+            url = f"{self.server_url}/fetch_metrics?client_id={self.client_id}"
+            response = await client.fetch(url, method="GET")
 
-            await asyncio.sleep(time_to_next_second)
-
-            start_time = time.time()
-
-            # Check for updates before sending metrics
-            await self.check_for_updates()
-            await self.fetch_new_metrics()
-            await self.send_metrics_once()
-
-            elapsed_time = time.time() - start_time
-            sleep_time = self.interval - elapsed_time
-            if sleep_time > 0:
-                await asyncio.sleep(sleep_time)
+            if response.code == 200:
+                new_metrics = json.loads(response.body)
+                for metric_name, metric_code in new_metrics.items():
+                    self.update_metric_script(metric_name, metric_code)
             else:
-                logger.warning(f"Metric collection took longer than interval: {elapsed_time:.2f} seconds")
+                logger.error(f"Failed to fetch new metrics. Status code: {response.code}")
+        except Exception as e:
+            logger.error(f"Error fetching new metrics: {e}")
+
+    def update_metric_script(self, metric_name, metric_code):
+        file_path = os.path.join(self.config['metrics_dir'], f"{metric_name}.py")
+        with open(file_path, 'w') as f:
+            f.write(metric_code)
+
+        if metric_name in sys.modules:
+            spec = importlib.util.spec_from_file_location(metric_name, file_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            sys.modules[metric_name] = module
+            self.metrics_modules[metric_name] = module
 
     async def send_metrics_once(self):
         self.collect_metrics()
         latest_metrics = self.metrics_store.get_all_latest()
-        metrics_to_send = {name: point.value for name, point in latest_metrics.items() if point is not None}
+        metrics_to_send = {name: {'value': point.value, 'timestamp': point.timestamp}
+                           for name, point in latest_metrics.items() if point is not None}
         data_to_send = {
             "hostname": self.hostname,
             "client_id": self.client_id,
@@ -272,20 +288,87 @@ class MonitoringClient:
             "tags": self.tags
         }
         logger.info(f"Preparing to send metrics: {data_to_send}")
-        try:
-            client = tornado.httpclient.AsyncHTTPClient()
-            response = await client.fetch(
-                self.server_url + "/metrics",
-                method="POST",
-                body=json.dumps(data_to_send)
-            )
-            response_body = response.body.decode('utf-8')
-            response_json = json.loads(response_body)
-            logger.info(f"Sent metrics: {data_to_send}, response: {response_json}")
-        except Exception as e:
-            logger.error(f"Error sending metrics: {e}", exc_info=True)
+
+        for attempt in range(self.max_retries):
+            try:
+                client = tornado.httpclient.AsyncHTTPClient()
+                response = await client.fetch(
+                    self.server_url + "/metrics",
+                    method="POST",
+                    body=json.dumps(data_to_send),
+                    request_timeout=10.0
+                )
+                response_body = response.body.decode('utf-8')
+                response_json = json.loads(response_body)
+                logger.info(f"Sent metrics: {data_to_send}, response: {response_json}")
+
+                # If successful, try to send any buffered metrics
+                await self.send_buffered_metrics()
+                return  # Exit the retry loop if successful
+            except Exception as e:
+                logger.error(f"Error sending metrics (attempt {attempt + 1}/{self.max_retries}): {e}", exc_info=True)
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay)
+                else:
+                    # If all retries fail, add to buffer
+                    self.metric_buffer.add(data_to_send)
+                    logger.info("Added metrics to buffer after failed retries")
+
+    async def send_buffered_metrics(self):
+        buffered_metrics = self.metric_buffer.get_all()
+        successful_ids = []
+        client = tornado.httpclient.AsyncHTTPClient()
+        for id, data, _ in buffered_metrics:
+            try:
+                response = await client.fetch(
+                    self.server_url + "/metrics",
+                    method="POST",
+                    body=data,
+                    request_timeout=10.0
+                )
+                if response.code == 200:
+                    successful_ids.append(id)
+            except Exception as e:
+                logger.error(f"Error sending buffered metric {id}: {e}", exc_info=True)
+                break  # Stop trying to send if we encounter an error
+
+        # Remove successfully sent metrics from the buffer
+        if successful_ids:
+            self.metric_buffer.remove(successful_ids)
+
+    async def run(self):
+        while True:
+            try:
+                now = time.time()
+                fraction_of_second = now % 1
+                time_to_next_second = 1 - fraction_of_second
+
+                await asyncio.sleep(time_to_next_second)
+
+                start_time = time.time()
+
+                # Check for updates before sending metrics
+                await self.check_for_updates()
+                await self.fetch_new_metrics()
+                await self.send_metrics_once()
+
+                elapsed_time = time.time() - start_time
+                sleep_time = self.interval - elapsed_time
+                if sleep_time > 0:
+                    await asyncio.sleep(sleep_time)
+                else:
+                    logger.warning(f"Metric collection took longer than interval: {elapsed_time:.2f} seconds")
+            except Exception as e:
+                logger.error(f"Error in main loop: {e}", exc_info=True)
+                await asyncio.sleep(self.interval)  # Wait before retrying
 
 
 if __name__ == "__main__":
     client = MonitoringClient()
-    tornado.ioloop.IOLoop.current().run_sync(client.run)
+    try:
+        tornado.ioloop.IOLoop.current().run_sync(client.run)
+    except KeyboardInterrupt:
+        logger.info("Received keyboard interrupt. Shutting down...")
+    finally:
+        client.metric_buffer.close()
+        logger.info("Client shut down successfully.")
