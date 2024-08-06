@@ -93,40 +93,32 @@ class FetchHistoryHandler(BaseHandler):
         try:
             start = float(self.get_argument("start", 0))
             end = float(self.get_argument("end", time.time()))
-            limit = int(self.get_argument("limit", 500))
-
-            logger.info(
-                f"Fetching history for {hostname}, metric: {metric_name}, start: {start}, end: {end}, limit: {limit}")
 
             with self.db.get_cursor() as cursor:
-                try:
-                    # Fetch all points, ordered by timestamp
-                    cursor.execute("""
-                        SELECT m.timestamp, m.value
-                        FROM metrics m
-                        JOIN hosts h ON m.host_id = h.id
-                        WHERE h.hostname = %s AND m.metric_name = %s AND m.timestamp BETWEEN %s AND %s
-                        ORDER BY m.timestamp
-                    """, (hostname, metric_name, start, end))
+                cursor.execute("""
+                    SELECT timestamp, value
+                    FROM metrics m
+                    JOIN hosts h ON m.host_id = h.id
+                    WHERE h.hostname = %s AND m.metric_name = %s AND m.timestamp BETWEEN %s AND %s
+                    ORDER BY m.timestamp
+                """, (hostname, metric_name, start, end))
 
-                    history = cursor.fetchall()
+                history = cursor.fetchall()
 
-                except Exception as e:
-                    logger.error(f"Database operation failed: {e}")
-                    self.set_status(500)
-                    self.write({"error": "Internal server error"})
-                    return
+            # Fill in gaps with null values
+            result = []
+            current_time = start
+            for point in history:
+                while current_time < point['timestamp']:
+                    result.append([current_time, None])
+                    current_time += 60  # Assume 1-minute intervals, adjust as needed
+                result.append([point['timestamp'], point['value']])
+                current_time = point['timestamp'] + 60
 
-            total_points = len(history)
+            while current_time <= end:
+                result.append([current_time, None])
+                current_time += 60
 
-            # If we have more points than the limit, sample them
-            if total_points > limit:
-                step = max(1, total_points // limit)
-                history = [history[i] for i in range(0, total_points, step)]
-                history = history[:limit]  # Ensure we don't exceed the limit
-
-            result = [[row['timestamp'], row['value']] for row in history]
-            logger.info(f"Sending response with {len(result)} data points out of {total_points} total")
             self.write(json.dumps(result))
         except Exception as e:
             logger.error(f"Error in FetchHistoryHandler: {str(e)}")
