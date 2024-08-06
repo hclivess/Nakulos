@@ -17,6 +17,12 @@ function getVibrantColor(index) {
     return vibrantColors[index % vibrantColors.length];
 }
 
+function updateUrlWithHost(hostname) {
+    const url = new URL(window.location);
+    url.searchParams.set('host', hostname);
+    window.history.pushState({}, '', url);
+}
+
 function createHostSelector(hosts) {
     console.log('Hosts data received:', hosts);
 
@@ -44,6 +50,7 @@ function createHostSelector(hosts) {
 
     select.addEventListener('change', async () => {
         const selectedHostname = select.value;
+        updateUrlWithHost(selectedHostname);
         await updateDashboard(selectedHostname);
         updateFormVisibility(selectedHostname);
     });
@@ -188,12 +195,25 @@ async function updateDashboard(hostname) {
     await updateAlertConfigs(hostname);
 }
 
+function checkUrlForHost() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hostParam = urlParams.get('host');
+    if (hostParam) {
+        const hostSelect = document.getElementById('hostSelect');
+        if (hostSelect) {
+            hostSelect.value = hostParam;
+            updateDashboard(hostParam);
+            updateFormVisibility(hostParam);
+        }
+    }
+}
+
 function initDashboard() {
     fetchHosts().then(hosts => {
         createHostSelector(hosts);
         setupTimeRangeButtons();
         setTimeRange('hour');
-        updateDashboard('all');
+        checkUrlForHost();
         updateFormVisibility('all');
         setupAlertUpdates();
         document.getElementById('removeHostButton').addEventListener('click', removeSelectedHost);
