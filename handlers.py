@@ -88,10 +88,16 @@ class MetricsHandler(BaseHandler):
             data = json.loads(self.request.body)
             hostname = data['hostname']
             metrics = data['metrics']
-            timestamp = time.time()
             tags = data.get('tags', {})
 
-            for metric_name, value in metrics.items():
+            for metric_name, metric_data in metrics.items():
+                if isinstance(metric_data, dict) and 'value' in metric_data and 'timestamp' in metric_data:
+                    value = metric_data['value']
+                    timestamp = metric_data['timestamp']
+                else:
+                    value = metric_data
+                    timestamp = time.time()  # Fallback to current time if client didn't provide timestamp
+
                 metric_data = {
                     'hostname': hostname,
                     'metric_name': metric_name,
