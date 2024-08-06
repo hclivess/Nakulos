@@ -1,9 +1,26 @@
 {
+    "client_id": "unique_client_001",
     "server_url": "http://localhost:8888",
-    "interval": 1,
+    "interval": 60,
     "metrics_dir": "./metrics",
     "tags": {
-        "alias": "My Server",
-        "location": "Data Center 1"
-    }
+        "environment": "production",
+        "location": "data_center_1",
+        "role": "web_server"
+    },
+    "metrics": [
+        {
+            "name": "cpu_usage",
+            "module": "cpu_metric"
+        },
+        {
+            "name": "memory_usage",
+            "module": "memory_metric"
+        },
+        {
+            "name": "disk_usage",
+            "module": "disk_metric"
+        }
+    ],
+    "last_update": "0"
 }

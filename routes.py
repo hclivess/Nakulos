@@ -2,11 +2,13 @@ import tornado.web
 from handlers import (MainHandler, MetricsHandler, FetchLatestHandler,
                       FetchHistoryHandler, FetchHostsHandler, AlertConfigHandler,
                       AlertStateHandler, DowntimeHandler, RecentAlertsHandler,
-                      DashboardHandler, JSHandler, AggregateDataHandler, RemoveHostHandler)
+                      DashboardHandler, JSHandler, AggregateDataHandler, RemoveHostHandler,
+                      ClientConfigHandler)
 
 def make_app(metric_processor):
     return tornado.web.Application([
         (r"/", MainHandler),
+        (r"/client_config", ClientConfigHandler),
         (r"/metrics", MetricsHandler, dict(metric_processor=metric_processor)),
         (r"/fetch/latest", FetchLatestHandler),
         (r"/fetch/history/([^/]+)/([^/]+)", FetchHistoryHandler),
