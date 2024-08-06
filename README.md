@@ -8,10 +8,16 @@ This is an advanced, scalable monitoring system built with Python and Tornado. I
 - Extensible metric collection through custom Python scripts
 - PostgreSQL database for robust and scalable storage of metrics
 - In-memory queue system for efficient metric processing
+- Client-side buffering for resilience against network issues
 - Advanced data aggregation for handling thousands of hosts
 - RESTful API for fetching latest metrics and historical data
 - Automatic cleanup and aggregation of old data
 - Configurable alert system with support for downtimes
+- Interactive dashboard with real-time updates
+- URL-based host selection for easy sharing and bookmarking
+- Host tagging system for better organization
+- Admin interface for managing clients and uploading new metrics
+- Data simulation tool for testing and development
 
 ## Requirements
 
@@ -19,13 +25,13 @@ This is an advanced, scalable monitoring system built with Python and Tornado. I
 - Tornado web framework
 - PostgreSQL database
 - psycopg2-binary (PostgreSQL adapter for Python)
+- Chart.js (for dashboard visualizations)
 
 ## Installation
 
 1. Clone this repository or download the source files.
 2. Install the required packages:
 pip install tornado psycopg2-binary
-Copy
 3. Ensure you have PostgreSQL installed and running.
 
 ## File Structure
@@ -38,104 +44,96 @@ Copy
 - `queue_manager.py`: Manages the in-memory queue for metric processing
 - `data_aggregator.py`: Handles data aggregation for efficient storage
 - `server_config.json`: Configuration file for server settings
+- `client_config.json`: Configuration file for client settings
+- `dashboard.html`: HTML template for the dashboard
+- `dashboard.js`: JavaScript for dashboard functionality
+- `chart.js`: Chart configuration for dashboard
+- `alerts.js`: Alert management on the dashboard
+- `downtimes.js`: Downtime management on the dashboard
+- `utils.js`: Utility functions for the dashboard
+- `admin_interface.html`: HTML template for the admin interface
+- `admin.js`: JavaScript for admin interface functionality
+- `simulator.py`: Data simulation tool for testing
+- `wipeout.py`: Script to clear all data (use with caution)
 
 ## Setup
 
 1. Server Setup:
-- Create a `server_config.json` file with your database and server settings:
-  ```json
-  {
-    "database": {
-      "host": "localhost",
-      "port": 5432,
-      "username": "your_username",
-      "password": "your_password",
-      "database_name": "monitoring"
-    },
-    "webapp": {
-      "port": 8888
-    }
-  }
-  ```
-- Run the server using:
-  ```
-  python server.py
-  ```
-- The server will start on http://localhost:8888 (or the port specified in your config)
+- Create a `server_config.json` file with your database and server settings.
+- Run the server using: `python server.py`
 
 2. Client Setup:
 - Create a metrics directory in the same location as client.py
 - Add custom Python scripts to the metrics directory for each metric you want to collect
-- Each script should have a collect() function that returns the metric value
-- Run the client using:
-  ```
-  python client.py
-  ```
+- Configure `client_config.json` with appropriate settings
+- Run the client using: `python client.py`
 
 ## Usage
+
+### Dashboard
+
+Access the dashboard at `http://localhost:8888/dashboard`. Features include:
+- Real-time metric visualizations
+- Host selection with URL-based sharing
+- Alert configuration and management
+- Downtime scheduling
+
+### Admin Interface
+
+Access the admin interface at `http://localhost:8888/admin`. Features include:
+- Client configuration management
+- Metric script uploading
+- Host tag management
 
 ### Adding Custom Metrics
 
 To add a new metric:
 1. Create a new Python file in the metrics directory
-2. Implement a collect() function that returns the metric value
-3. The client will automatically load and use this new metric
+2. Implement a `collect()` function that returns the metric value
 
-## Example (metrics/cpu_usage.py):
+### Client Buffering
 
-python
-import psutil
+The client implements a local buffer to store metrics when the server is unreachable. Features include:
+- Automatic buffering of metrics during network issues
+- Configurable buffer size
+- Automatic retry and buffer flush when connection is restored
+- Persistent storage using SQLite for resilience against client restarts
 
-def collect():
- return psutil.cpu_percent()
+### API Endpoints
 
-## API Endpoints
+- `GET /`: Check if the server is running
+- `POST /metrics`: Submit metrics (used by the client)
+- `GET /fetch/latest`: Get the latest metrics for all hosts
+- `GET /fetch/history/<hostname>/<metric_name>`: Get historical data for a specific metric
+- `GET /fetch/hosts`: Get a list of all hosts
+- `POST /alert_config`: Configure alerts
+- `POST /alert_state`: Update alert state
+- `GET /downtime`: Get downtime information
+- `POST /downtime`: Schedule a downtime
+- `GET /fetch/recent_alerts`: Get recent alerts
+- `POST /aggregate`: Trigger manual data aggregation
+- `POST /remove_host`: Remove a host from the system
+- `POST /update_tags`: Update tags for a host
+- `GET /client_config`: Fetch client configuration
+- `POST /client_config`: Register or update client configuration
 
-GET /: Check if the server is running
-POST /metrics: Submit metrics (used by the client)
-GET /fetch/latest: Get the latest metrics for all hosts
-GET /fetch/history/<hostname>/<metric_name>: Get historical data for a specific metric
-GET /fetch/hosts: Get a list of all hosts
-POST /alert_config: Configure alerts
-POST /alert_state: Update alert state
-GET /downtime: Get downtime information
-POST /downtime: Schedule a downtime
-GET /fetch/recent_alerts: Get recent alerts
-POST /aggregate: Trigger manual data aggregation
+## Data Simulation
 
-## Fetching Data
-To fetch the latest metrics:
-Copycurl http://localhost:8888/fetch/latest
-To fetch historical data:
-Copycurl http://localhost:8888/fetch/history/hostname/metric_name?limit=100
+Use `simulator.py` to generate test data:
+python simulator.py
+Follow the prompts to specify the number of hosts, days of data, and metrics per hour.
 
-## Configuration
+## Data Retention and Aggregation
 
-Server configuration: Edit the server_config.json file
-Client configuration: Edit the config dictionary in client.py
-
-Data Retention and Aggregation
-The system now uses advanced data aggregation techniques to efficiently store historical data. This allows for handling thousands of hosts while maintaining performance. Aggregation is performed automatically on a schedule, and can also be triggered manually via the API.
+The system uses advanced data aggregation techniques to efficiently store historical data. Aggregation is performed automatically on a schedule, and can also be triggered manually via the API.
 
 ## Contributing
+
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
 This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0).
 
-This means you are free to:
-
-- Share — copy and redistribute the material in any medium or format
-- Adapt — remix, transform, and build upon the material
-
-Under the following terms:
-
-- Attribution — You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
-- NonCommercial — You may not use the material for commercial purposes.
-
-For commercial use, please contact the project maintainers to discuss licensing options.
-
 For more details about this license, please visit:
 https://creativecommons.org/licenses/by-nc/4.0/
-This license allows free use for non-commercial purposes while requiring attribution. It also leaves the door open for potential commercial licensing arrangements.
