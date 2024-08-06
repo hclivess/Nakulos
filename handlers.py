@@ -181,6 +181,7 @@ class ClientConfigHandler(BaseHandler):
         data = json.loads(self.request.body)
         client_id = data.get('client_id')
         new_config = data.get('config')
+        tags = data.get('tags', {})
 
         if not client_id or not new_config:
             self.set_status(400)
@@ -190,11 +191,11 @@ class ClientConfigHandler(BaseHandler):
         try:
             with self.db.get_cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO client_configs (client_id, config)
-                    VALUES (%s, %s)
+                    INSERT INTO client_configs (client_id, config, tags)
+                    VALUES (%s, %s, %s)
                     ON CONFLICT (client_id) DO UPDATE
-                    SET config = EXCLUDED.config, last_updated = NOW()
-                """, (client_id, json.dumps(new_config)))
+                    SET config = EXCLUDED.config, tags = EXCLUDED.tags, last_updated = NOW()
+                """, (client_id, json.dumps(new_config), json.dumps(tags)))
 
             self.write({"status": "success", "message": "Client registered successfully"})
         except Exception as e:
@@ -634,12 +635,23 @@ class FetchMetricsHandler(BaseHandler):
 
         try:
             with self.db.get_cursor() as cursor:
+                # First, get the tags for the client
+                cursor.execute("SELECT tags FROM client_configs WHERE client_id = %s", (client_id,))
+                result = cursor.fetchone()
+                if not result:
+                    self.set_status(404)
+                    self.write({"error": "Client not found"})
+                    return
+
+                client_tags = result['tags'] or {}
+
+                # Now, fetch matching metrics
                 cursor.execute("""
-                    SELECT ms.name, ms.code
-                    FROM metric_scripts ms
-                    JOIN client_configs cc ON cc.client_id = %s
-                    WHERE ms.tags @> cc.tags
-                """, (client_id,))
+                    SELECT name, code
+                    FROM metric_scripts
+                    WHERE tags @> %s OR tags IS NULL OR tags = '{}' OR %s = '{}'
+                """, (json.dumps(client_tags), json.dumps(client_tags)))
+
                 metrics = {row['name']: row['code'] for row in cursor.fetchall()}
 
             self.write(json.dumps(metrics))

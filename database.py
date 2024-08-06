@@ -142,8 +142,16 @@ def init_db(config):
                 CREATE TABLE IF NOT EXISTS client_configs (
                     client_id VARCHAR(255) PRIMARY KEY,
                     config JSONB NOT NULL,
+                    tags JSONB,
                     last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 )
+            '''),
+            ("metric_scripts", '''
+            CREATE TABLE IF NOT EXISTS metric_scripts (
+                name VARCHAR(255) PRIMARY KEY,
+                code TEXT NOT NULL,
+                tags JSONB
+            )
             ''')
         ]
 
