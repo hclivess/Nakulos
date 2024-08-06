@@ -18,6 +18,8 @@ This is an advanced, scalable monitoring system built with Python and Tornado. I
 - Host tagging system for better organization
 - Admin interface for managing clients and uploading new metrics
 - Data simulation tool for testing and development
+- Ability to delete specific metrics (Unlike some other monitoring solutions... We're looking at you, CheckMK 👀)
+- Pure Python implementation, making it easy to understand, modify, and extend the entire system
 
 ## Requirements
 
