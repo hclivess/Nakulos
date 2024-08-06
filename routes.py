@@ -28,6 +28,7 @@ def make_app(metric_processor):
         (r"/dashboard.js", JSHandler, {"filename": "dashboard.js"}),
         (r"/chart.js", JSHandler, {"filename": "chart.js"}),
         (r"/alerts.js", JSHandler, {"filename": "alerts.js"}),
+        (r"/admin.js", JSHandler, {"filename": "admin.js"}),
         (r"/downtimes.js", JSHandler, {"filename": "downtimes.js"}),
         (r"/utils.js", JSHandler, {"filename": "utils.js"}),
         (r"/aggregate", AggregateDataHandler),
