@@ -51,7 +51,8 @@ function initChart(metric, datasets) {
                 }
             },
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            spanGaps: true
         }
     });
 }
