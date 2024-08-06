@@ -4,12 +4,15 @@ from handlers import (MainHandler, MetricsHandler, FetchLatestHandler,
                       AlertStateHandler, DowntimeHandler, RecentAlertsHandler,
                       DashboardHandler, JSHandler, AggregateDataHandler, RemoveHostHandler,
                       ClientConfigHandler, AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler,
-                      FetchMetricsHandler, UpdateTagsHandler, DeleteMetricsHandler, FetchMetricsForHostHandler)
+                      FetchMetricsHandler, UpdateTagsHandler, DeleteMetricsHandler, FetchMetricsForHostHandler,
+                      LoginHandler, RegisterHandler)
 
 
 def make_app(metric_processor):
     return tornado.web.Application([
         (r"/", MainHandler),
+        (r"/login", LoginHandler),
+        (r"/register", RegisterHandler),
         (r"/fetch/metrics_for_host", FetchMetricsForHostHandler),
         (r"/fetch_metrics", FetchMetricsHandler),
         (r"/update_tags", UpdateTagsHandler),
@@ -35,5 +38,7 @@ def make_app(metric_processor):
         (r"/utils.js", JSHandler, {"filename": "utils.js"}),
         (r"/aggregate", AggregateDataHandler),
         (r"/remove_host", RemoveHostHandler),
-        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"}),
-    ])
+        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"})],
+        cookie_secret="YOUR_SECRET_KEY_HERE",  # Replace with a strong, random secret
+        login_url="/login"
+    )

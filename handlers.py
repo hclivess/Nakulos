@@ -1,3 +1,5 @@
+import bcrypt
+from database import get_db
 import tornado.web
 import json
 import time
@@ -5,11 +7,103 @@ import logging
 from database import get_db
 from data_aggregator import aggregate_data
 import os
+import urllib
+from tornado.web import HTTPError
+
 
 logger = logging.getLogger(__name__)
 
+class BaseHandler(tornado.web.RequestHandler):
+    def initialize(self):
+        self.db = get_db()
 
-class AdminInterfaceHandler(tornado.web.RequestHandler):
+    def get_current_user(self):
+        user_id = self.get_secure_cookie("user")
+        if user_id:
+            # You might want to fetch the user from the database here
+            return user_id
+        return None
+
+    def prepare(self):
+        if self.request.path == "/login":
+            # Skip authentication check for login page
+            return
+
+        if not self.current_user:
+            if self.request.method == "GET":
+                url = self.get_login_url()
+                if "?" not in url:
+                    url += "?" + urllib.parse.urlencode(dict(next=self.request.uri))
+                self.redirect(url)
+                return
+            raise HTTPError(403)
+
+class LoginHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.render("login.html")
+
+    async def post(self):
+        username = self.get_argument("username", "")
+        password = self.get_argument("password", "")
+
+        user = await self.check_credentials(username, password)
+        if user:
+            self.set_secure_cookie("user", str(user['id']))
+            logger.info(f"User {username} logged in successfully")
+            self.redirect("/dashboard")
+        else:
+            logger.warning(f"Failed login attempt for user {username}")
+            self.render("login.html", error="Invalid username or password")
+
+    async def check_credentials(self, username, password):
+        db = get_db()
+        try:
+            with db.get_cursor() as cursor:
+                cursor.execute("SELECT id, password FROM users WHERE username = %s", (username,))
+                user = cursor.fetchone()
+
+                if user and bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
+                    return user
+        except Exception as e:
+            logger.error(f"Database error during login: {e}")
+        return None
+
+
+class RegisterHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.render("register.html")
+
+    def post(self):
+        username = self.get_argument("username", "")
+        password = self.get_argument("password", "")
+        confirm_password = self.get_argument("confirm_password", "")
+
+        if password != confirm_password:
+            self.write("Passwords do not match")
+            return
+
+        if self.username_exists(username):
+            self.write("Username already exists")
+            return
+
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+        db = get_db()
+        with db.get_cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO users (username, password) VALUES (%s, %s)",
+                (username, hashed_password.decode('utf-8'))
+            )
+
+        self.redirect("/login")
+
+    def username_exists(self, username):
+        db = get_db()
+        with db.get_cursor() as cursor:
+            cursor.execute("SELECT 1 FROM users WHERE username = %s", (username,))
+            return cursor.fetchone() is not None
+
+class AdminInterfaceHandler(BaseHandler):
     def get(self):
         db = get_db()
         with db.get_cursor() as cursor:
@@ -70,9 +164,9 @@ class UploadMetricHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"message": "Internal server error"})
 
-class BaseHandler(tornado.web.RequestHandler):
-    def initialize(self):
-        self.db = get_db()
+
+
+
 
 class MainHandler(BaseHandler):
     def get(self):
@@ -576,6 +670,9 @@ class FetchMetricsForHostHandler(BaseHandler):
             logger.error(f"Error in FetchMetricsForHostHandler: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
+
+
+
 class DeleteMetricsHandler(BaseHandler):
     async def post(self):
         try:
@@ -629,7 +726,7 @@ class DeleteMetricsHandler(BaseHandler):
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
-class DashboardHandler(tornado.web.RequestHandler):
+class DashboardHandler(BaseHandler):
     def initialize(self):
         self.db = get_db()
 

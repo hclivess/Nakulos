@@ -147,11 +147,19 @@ def init_db(config):
                 )
             '''),
             ("metric_scripts", '''
-            CREATE TABLE IF NOT EXISTS metric_scripts (
-                name VARCHAR(255) PRIMARY KEY,
-                code TEXT NOT NULL,
-                tags JSONB
-            )
+                CREATE TABLE IF NOT EXISTS metric_scripts (
+                    name VARCHAR(255) PRIMARY KEY,
+                    code TEXT NOT NULL,
+                    tags JSONB
+                )
+            '''),
+            ("users", '''
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password VARCHAR(60) NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
             ''')
         ]
 
@@ -179,6 +187,7 @@ def load_config(config_path='server_config.json'):
     except json.JSONDecodeError:
         logger.error(f"Invalid JSON in config file: {config_path}")
         raise
+
 
 
 def setup_database():
