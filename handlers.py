@@ -11,7 +11,11 @@ logger = logging.getLogger(__name__)
 
 class AdminInterfaceHandler(tornado.web.RequestHandler):
     def get(self):
-        self.render("admin_interface.html")
+        db = get_db()
+        with db.get_cursor() as cursor:
+            cursor.execute("SELECT hostname FROM hosts")
+            hosts = [row['hostname'] for row in cursor.fetchall()]
+        self.render("admin_interface.html", hosts=hosts)
 
 class UpdateClientHandler(tornado.web.RequestHandler):
     def post(self):

@@ -113,12 +113,17 @@ class MonitoringClient:
             if filename.endswith('.py'):
                 module_name = filename[:-3]
                 module_path = os.path.join(self.config['metrics_dir'], filename)
-                spec = importlib.util.spec_from_file_location(module_name, module_path)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                if hasattr(module, 'collect'):
-                    modules[module_name] = module
-                    logger.info(f"Loaded metric module: {module_name}")
+                try:
+                    spec = importlib.util.spec_from_file_location(module_name, module_path)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    if hasattr(module, 'collect'):
+                        modules[module_name] = module
+                        logger.info(f"Loaded metric module: {module_name}")
+                    else:
+                        logger.warning(f"Metric module {module_name} does not have a 'collect' function")
+                except Exception as e:
+                    logger.error(f"Error loading metric module {module_name}: {str(e)}")
         return modules
 
     def collect_metrics(self):
