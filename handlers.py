@@ -42,12 +42,12 @@ class UpdateClientHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"message": "Internal server error"})
 
-
 class UploadMetricHandler(tornado.web.RequestHandler):
     def post(self):
         data = json.loads(self.request.body)
         metric_name = data.get('name')
         metric_code = data.get('code')
+        tags = data.get('tags', [])  # New: Get tags for targeted hosts
 
         if not metric_name or not metric_code:
             self.set_status(400)
@@ -55,12 +55,14 @@ class UploadMetricHandler(tornado.web.RequestHandler):
             return
 
         try:
-            metrics_dir = "./metrics"  # Adjust this path as needed
-            os.makedirs(metrics_dir, exist_ok=True)
-
-            file_path = os.path.join(metrics_dir, f"{metric_name}.py")
-            with open(file_path, 'w') as f:
-                f.write(metric_code)
+            db = get_db()
+            with db.get_cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO metric_scripts (name, code, tags)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (name) DO UPDATE
+                    SET code = EXCLUDED.code, tags = EXCLUDED.tags
+                """, (metric_name, metric_code, json.dumps(tags)))
 
             self.write({"message": f"Metric '{metric_name}' uploaded successfully"})
         except Exception as e:
@@ -561,6 +563,35 @@ class AggregateDataHandler(BaseHandler):
             self.write({"error": "Internal server error"})
 
 
+class UpdateTagsHandler(BaseHandler):
+    async def post(self):
+        data = json.loads(self.request.body)
+        hostname = data.get('hostname')
+        new_tags = data.get('tags')
+
+        if not hostname or new_tags is None:
+            self.set_status(400)
+            self.write({"error": "Both hostname and tags are required"})
+            return
+
+        try:
+            with self.db.get_cursor() as cursor:
+                cursor.execute("""
+                    UPDATE hosts
+                    SET tags = %s
+                    WHERE hostname = %s
+                """, (json.dumps(new_tags), hostname))
+
+                if cursor.rowcount == 0:
+                    self.set_status(404)
+                    self.write({"error": "Host not found"})
+                else:
+                    self.write({"message": "Tags updated successfully"})
+        except Exception as e:
+            logger.error(f"Error updating tags: {str(e)}")
+            self.set_status(500)
+            self.write({"error": "Internal server error"})
+
 class RemoveHostHandler(BaseHandler):
         async def post(self):
             try:
@@ -592,3 +623,27 @@ class RemoveHostHandler(BaseHandler):
                 logger.error(f"Error in RemoveHostHandler: {str(e)}")
                 self.set_status(500)
                 self.write(json.dumps({"error": "Internal server error"}))
+
+class FetchMetricsHandler(BaseHandler):
+    async def get(self):
+        client_id = self.get_argument('client_id', None)
+        if not client_id:
+            self.set_status(400)
+            self.write({"error": "Client ID is required"})
+            return
+
+        try:
+            with self.db.get_cursor() as cursor:
+                cursor.execute("""
+                    SELECT ms.name, ms.code
+                    FROM metric_scripts ms
+                    JOIN client_configs cc ON cc.client_id = %s
+                    WHERE ms.tags @> cc.tags
+                """, (client_id,))
+                metrics = {row['name']: row['code'] for row in cursor.fetchall()}
+
+            self.write(json.dumps(metrics))
+        except Exception as e:
+            logger.error(f"Error in FetchMetricsHandler: {str(e)}")
+            self.set_status(500)
+            self.write({"error": "Internal server error"})

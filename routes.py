@@ -3,12 +3,15 @@ from handlers import (MainHandler, MetricsHandler, FetchLatestHandler,
                       FetchHistoryHandler, FetchHostsHandler, AlertConfigHandler,
                       AlertStateHandler, DowntimeHandler, RecentAlertsHandler,
                       DashboardHandler, JSHandler, AggregateDataHandler, RemoveHostHandler,
-                      ClientConfigHandler, AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler)
+                      ClientConfigHandler, AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler,
+                      FetchMetricsHandler, UpdateTagsHandler)
 
 
 def make_app(metric_processor):
     return tornado.web.Application([
         (r"/", MainHandler),
+        (r"/fetch_metrics", FetchMetricsHandler),
+        (r"/update_tags", UpdateTagsHandler),
         (r"/admin", AdminInterfaceHandler),
         (r"/admin/update_client", UpdateClientHandler),
         (r"/admin/upload_metric", UploadMetricHandler),

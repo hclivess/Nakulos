@@ -3,56 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Interface</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Monitoring System Admin Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
     <div class="container mt-5">
-        <h1>Admin Interface</h1>
+        <h1 class="mb-4">Monitoring System Admin Portal</h1>
 
-        <h2 id="update-client-configuration" class="mt-4">Update Client Configuration</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <h2>Update Client Configuration</h2>
+                <form id="updateClientForm">
+                    <div class="mb-3">
+                        <label for="clientId" class="form-label">Client ID:</label>
+                        <select id="clientId" class="form-select" required>
+                            {% for host in hosts %}
+                                <option value="{{ host }}">{{ host }}</option>
+                            {% end %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="clientConfig" class="form-label">Configuration JSON:</label>
+                        <textarea id="clientConfig" class="form-control" rows="5" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Client</button>
+                </form>
+            </div>
 
-        <div class="mb-3">
-            <label for="clientId">Client ID</label>
-            <select id="clientId" class="form-select">
-                <option value="">Select a host</option>
-                {% for host in hosts %}
-                <option value="{{ host }}">{{ host }}</option>
-                {% end %}
-            </select>
+            <div class="col-md-6">
+                <h2>Upload New Metric</h2>
+                <form id="uploadMetricForm">
+                    <div class="mb-3">
+                        <label for="metricName" class="form-label">Metric Name:</label>
+                        <input type="text" id="metricName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="metricCode" class="form-label">Metric Code:</label>
+                        <textarea id="metricCode" class="form-control" rows="10" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="metricTags" class="form-label">Target Tags (JSON):</label>
+                        <textarea id="metricTags" class="form-control" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload Metric</button>
+                </form>
+            </div>
         </div>
 
-        <div class="mb-3">
-            <label for="configJson">Configuration JSON</label>
-            <textarea id="configJson" class="form-control" rows="5"></textarea>
+        <div class="row mt-5">
+            <div class="col-md-6">
+                <h2>Update Host Tags</h2>
+                <form id="updateTagsForm">
+                    <div class="mb-3">
+                        <label for="tagHostname" class="form-label">Hostname:</label>
+                        <select id="tagHostname" class="form-select" required>
+                            {% for host in hosts %}
+                                <option value="{{ host }}">{{ host }}</option>
+                            {% end %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newTags" class="form-label">New Tags (JSON):</label>
+                        <textarea id="newTags" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Tags</button>
+                </form>
+            </div>
+
+            <div class="col-md-6">
+                <h2>Remove Host</h2>
+                <form id="removeHostForm">
+                    <div class="mb-3">
+                        <label for="removeHostname" class="form-label">Hostname:</label>
+                        <select id="removeHostname" class="form-select" required>
+                            {% for host in hosts %}
+                                <option value="{{ host }}">{{ host }}</option>
+                            {% end %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-danger">Remove Host</button>
+                </form>
+            </div>
         </div>
-
-        <button id="updateClientButton" class="btn btn-primary">Update Client</button>
-
-        <h2 id="upload-new-metric" class="mt-4">Upload New Metric</h2>
-
-        <div class="mb-3">
-            <label for="metricName">Metric Name</label>
-            <input type="text" id="metricName" class="form-control">
-        </div>
-
-        <div class="mb-3">
-            <label for="metricCode">Metric Code</label>
-            <textarea id="metricCode" class="form-control" rows="10"></textarea>
-        </div>
-
-        <button id="uploadMetricButton" class="btn btn-primary">Upload Metric</button>
     </div>
 
     <script>
-        document.getElementById('updateClientButton').addEventListener('click', async () => {
+        document.getElementById('updateClientForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
             const clientId = document.getElementById('clientId').value;
-            const configJson = document.getElementById('configJson').value;
-
-            if (!clientId || !configJson) {
-                alert('Please select a host and provide a valid configuration JSON.');
-                return;
-            }
+            const config = JSON.parse(document.getElementById('clientConfig').value);
 
             try {
                 const response = await fetch('/admin/update_client', {
@@ -60,29 +100,26 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ client_id: clientId, config: JSON.parse(configJson) }),
+                    body: JSON.stringify({ client_id: clientId, config: config }),
                 });
 
                 if (response.ok) {
-                    alert('Client configuration updated successfully.');
+                    alert('Client configuration updated successfully');
                 } else {
                     const errorData = await response.json();
-                    alert(`Failed to update client configuration: ${errorData.message}`);
+                    alert(`Failed to update client configuration: ${errorData.error}`);
                 }
             } catch (error) {
                 console.error('Error updating client configuration:', error);
-                alert('An error occurred while updating the client configuration.');
+                alert('An error occurred while updating client configuration');
             }
         });
 
-        document.getElementById('uploadMetricButton').addEventListener('click', async () => {
+        document.getElementById('uploadMetricForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
             const metricName = document.getElementById('metricName').value;
             const metricCode = document.getElementById('metricCode').value;
-
-            if (!metricName || !metricCode) {
-                alert('Please provide a metric name and code.');
-                return;
-            }
+            const metricTags = JSON.parse(document.getElementById('metricTags').value || '[]');
 
             try {
                 const response = await fetch('/admin/upload_metric', {
@@ -90,18 +127,73 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ name: metricName, code: metricCode }),
+                    body: JSON.stringify({ name: metricName, code: metricCode, tags: metricTags }),
                 });
 
                 if (response.ok) {
-                    alert('Metric uploaded successfully.');
+                    alert('Metric uploaded successfully');
                 } else {
                     const errorData = await response.json();
-                    alert(`Failed to upload metric: ${errorData.message}`);
+                    alert(`Failed to upload metric: ${errorData.error}`);
                 }
             } catch (error) {
                 console.error('Error uploading metric:', error);
-                alert('An error occurred while uploading the metric.');
+                alert('An error occurred while uploading metric');
+            }
+        });
+
+        document.getElementById('updateTagsForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const hostname = document.getElementById('tagHostname').value;
+            const newTags = JSON.parse(document.getElementById('newTags').value);
+
+            try {
+                const response = await fetch('/update_tags', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ hostname, tags: newTags }),
+                });
+
+                if (response.ok) {
+                    alert('Tags updated successfully');
+                } else {
+                    const errorData = await response.json();
+                    alert(`Failed to update tags: ${errorData.error}`);
+                }
+            } catch (error) {
+                console.error('Error updating tags:', error);
+                alert('An error occurred while updating tags');
+            }
+        });
+
+        document.getElementById('removeHostForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const hostname = document.getElementById('removeHostname').value;
+
+            if (confirm(`Are you sure you want to remove the host "${hostname}"? This action cannot be undone.`)) {
+                try {
+                    const response = await fetch('/remove_host', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ hostname: hostname }),
+                    });
+
+                    if (response.ok) {
+                        alert(`Host "${hostname}" has been removed successfully.`);
+                        // Refresh the page or update the host list
+                        location.reload();
+                    } else {
+                        const errorData = await response.json();
+                        alert(`Failed to remove host: ${errorData.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error removing host:', error);
+                    alert('An error occurred while trying to remove the host. Please try again.');
+                }
             }
         });
     </script>

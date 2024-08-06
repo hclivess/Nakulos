@@ -9,6 +9,7 @@ import time
 import logging
 import datetime
 import asyncio
+import sys
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -60,6 +61,34 @@ class MonitoringClient:
         self.tags = self.config.get('tags', {})
         self.last_update = self.config.get('last_update', '0')
         logger.info(f"MonitoringClient initialized with config: {self.config}")
+
+    async def fetch_new_metrics(self):
+        try:
+            client = tornado.httpclient.AsyncHTTPClient()
+            url = f"{self.server_url}/fetch_metrics?client_id={self.client_id}"
+            response = await client.fetch(url, method="GET")
+
+            if response.code == 200:
+                new_metrics = json.loads(response.body)
+                for metric_name, metric_code in new_metrics.items():
+                    self.update_metric_script(metric_name, metric_code)
+            else:
+                logger.error(f"Failed to fetch new metrics. Status code: {response.code}")
+        except Exception as e:
+            logger.error(f"Error fetching new metrics: {e}")
+
+    def update_metric_script(self, metric_name, metric_code):
+        file_path = os.path.join(self.config['metrics_dir'], f"{metric_name}.py")
+        with open(file_path, 'w') as f:
+            f.write(metric_code)
+
+        # Reload the module if it's already loaded
+        if metric_name in sys.modules:
+            spec = importlib.util.spec_from_file_location(metric_name, file_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            sys.modules[metric_name] = module
+            self.metrics_modules[metric_name] = module
 
     def load_config(self):
         try:
@@ -222,7 +251,7 @@ class MonitoringClient:
 
             # Check for updates before sending metrics
             await self.check_for_updates()
-
+            await self.fetch_new_metrics()
             await self.send_metrics_once()
 
             elapsed_time = time.time() - start_time
