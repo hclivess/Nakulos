@@ -552,6 +552,83 @@ from database import get_db
 
 logger = logging.getLogger(__name__)
 
+class FetchMetricsForHostHandler(BaseHandler):
+    async def get(self):
+        hostname = self.get_argument('hostname', None)
+        if not hostname:
+            self.set_status(400)
+            self.write({"error": "Hostname is required"})
+            return
+
+        try:
+            with self.db.get_cursor() as cursor:
+                cursor.execute("""
+                    SELECT DISTINCT m.metric_name
+                    FROM metrics m
+                    JOIN hosts h ON m.host_id = h.id
+                    WHERE h.hostname = %s
+                    ORDER BY m.metric_name
+                """, (hostname,))
+                metrics = [row['metric_name'] for row in cursor.fetchall()]
+
+            self.write(json.dumps(metrics))
+        except Exception as e:
+            logger.error(f"Error in FetchMetricsForHostHandler: {str(e)}")
+            self.set_status(500)
+            self.write({"error": "Internal server error"})
+class DeleteMetricsHandler(BaseHandler):
+    async def post(self):
+        try:
+            data = json.loads(self.request.body)
+            hostname = data.get('hostname')
+            metric_name = data.get('metric_name')
+            start_time = data.get('start_time')
+            end_time = data.get('end_time')
+
+            if not hostname:
+                self.set_status(400)
+                self.write({"error": "Hostname is required"})
+                return
+
+            with self.db.get_cursor() as cursor:
+                # First, get the host_id
+                cursor.execute("SELECT id FROM hosts WHERE hostname = %s", (hostname,))
+                host = cursor.fetchone()
+                if not host:
+                    self.set_status(404)
+                    self.write({"error": "Host not found"})
+                    return
+
+                host_id = host['id']
+
+                # Prepare the delete query
+                delete_query = "DELETE FROM metrics WHERE host_id = %s"
+                params = [host_id]
+
+                if metric_name and metric_name != 'all':
+                    delete_query += " AND metric_name = %s"
+                    params.append(metric_name)
+
+                if start_time:
+                    delete_query += " AND timestamp >= %s"
+                    params.append(start_time)
+                if end_time:
+                    delete_query += " AND timestamp <= %s"
+                    params.append(end_time)
+
+                cursor.execute(delete_query, params)
+                deleted_count = cursor.rowcount
+
+            message = f"Successfully deleted {deleted_count} metrics"
+            if metric_name and metric_name != 'all':
+                message += f" for {metric_name}"
+            message += f" from host {hostname}"
+            self.write({"message": message})
+        except Exception as e:
+            logger.error(f"Error in DeleteMetricsHandler: {str(e)}")
+            self.set_status(500)
+            self.write({"error": "Internal server error"})
+
 class DashboardHandler(tornado.web.RequestHandler):
     def initialize(self):
         self.db = get_db()

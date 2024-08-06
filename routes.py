@@ -4,12 +4,13 @@ from handlers import (MainHandler, MetricsHandler, FetchLatestHandler,
                       AlertStateHandler, DowntimeHandler, RecentAlertsHandler,
                       DashboardHandler, JSHandler, AggregateDataHandler, RemoveHostHandler,
                       ClientConfigHandler, AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler,
-                      FetchMetricsHandler, UpdateTagsHandler)
+                      FetchMetricsHandler, UpdateTagsHandler, DeleteMetricsHandler, FetchMetricsForHostHandler)
 
 
 def make_app(metric_processor):
     return tornado.web.Application([
         (r"/", MainHandler),
+        (r"/fetch/metrics_for_host", FetchMetricsForHostHandler),
         (r"/fetch_metrics", FetchMetricsHandler),
         (r"/update_tags", UpdateTagsHandler),
         (r"/admin", AdminInterfaceHandler),
@@ -26,6 +27,7 @@ def make_app(metric_processor):
         (r"/fetch/recent_alerts", RecentAlertsHandler),
         (r"/dashboard", DashboardHandler),
         (r"/dashboard.js", JSHandler, {"filename": "dashboard.js"}),
+        (r"/delete_metrics", DeleteMetricsHandler),
         (r"/chart.js", JSHandler, {"filename": "chart.js"}),
         (r"/alerts.js", JSHandler, {"filename": "alerts.js"}),
         (r"/admin.js", JSHandler, {"filename": "admin.js"}),
