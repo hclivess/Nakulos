@@ -166,14 +166,26 @@ class MonitoringClient:
             logger.error(f"Error registering client: {e}", exc_info=True)
 
     def apply_new_config(self, new_config):
-        self.config = new_config
-        self.config['last_update'] = str(int(time.time()))
-        self.save_config()
-        self.server_url = self.config['server_url']
-        self.interval = self.config['interval']
+        # Preserve important fields
+        preserved_fields = ['client_id', 'server_url']
+        for field in preserved_fields:
+            if field not in new_config and field in self.config:
+                new_config[field] = self.config[field]
+
+        # Update the configuration
+        self.config.update(new_config)
+
+        # Apply the updated configuration
+        self.interval = self.config.get('interval', 60)
+        self.metrics_dir = self.config.get('metrics_dir', './metrics')
         self.tags = self.config.get('tags', {})
-        self.metrics_modules = self.load_metric_modules()
-        self.last_update = self.config['last_update']
+        self.last_update = self.config.get('last_update', str(int(time.time())))
+
+        # Reload metric modules if metrics_dir has changed
+        if self.metrics_dir != self.config.get('metrics_dir'):
+            self.metrics_modules = self.load_metric_modules()
+
+        self.save_config()
         logger.info("Applied new configuration")
 
     async def run(self):

@@ -4,9 +4,9 @@
     "interval": 60,
     "metrics_dir": "./metrics",
     "tags": {
-        "environment": "production",
+        "role": "web_server",
         "location": "data_center_1",
-        "role": "web_server"
+        "environment": "production"
     },
     "metrics": [
         {
