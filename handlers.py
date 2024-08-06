@@ -111,6 +111,10 @@ class AdminInterfaceHandler(BaseHandler):
             hosts = [row['hostname'] for row in cursor.fetchall()]
         self.render("admin_interface.html", hosts=hosts)
 
+class LogoutHandler(BaseHandler):
+    def get(self):
+        self.clear_cookie("user")
+        self.redirect("/login")
 class UpdateClientHandler(tornado.web.RequestHandler):
     def post(self):
         data = json.loads(self.request.body)

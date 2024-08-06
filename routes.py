@@ -5,7 +5,7 @@ from handlers import (MainHandler, MetricsHandler, FetchLatestHandler,
                       DashboardHandler, JSHandler, AggregateDataHandler, RemoveHostHandler,
                       ClientConfigHandler, AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler,
                       FetchMetricsHandler, UpdateTagsHandler, DeleteMetricsHandler, FetchMetricsForHostHandler,
-                      LoginHandler, RegisterHandler)
+                      LoginHandler, RegisterHandler, LogoutHandler)
 
 
 def make_app(metric_processor):
@@ -38,6 +38,7 @@ def make_app(metric_processor):
         (r"/utils.js", JSHandler, {"filename": "utils.js"}),
         (r"/aggregate", AggregateDataHandler),
         (r"/remove_host", RemoveHostHandler),
+        (r"/logout", LogoutHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"})],
         cookie_secret="YOUR_SECRET_KEY_HERE",  # Replace with a strong, random secret
         login_url="/login"
