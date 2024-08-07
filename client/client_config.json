@@ -8,5 +8,12 @@
     "metrics_dir": "./metrics",
     "client_id": "84d629f2-87f2-4eaa-8e5d-39f05708d357",
     "server_url": "http://localhost:8888",
-    "last_update": "1723052756"
+    "last_update": "1723059428",
+    "default_interval": 60,
+    "secret_key": "your_very_secret_key_here",
+        "metric_intervals": {
+                                "cpu_usage": 30,
+                                "memory_usage": 45,
+                                "disk_usage": 120
+                            }
 }
