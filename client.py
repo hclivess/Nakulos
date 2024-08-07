@@ -97,7 +97,8 @@ class MonitoringClient:
     def __init__(self):
         self.config = self.load_config()
         self.server_url = self.config['server_url']
-        self.interval = self.config['interval']
+        self.default_interval = self.config.get('default_interval', 60)
+        self.metric_intervals = self.config.get('metric_intervals', {})
         self.metrics_modules = self.load_metric_modules()
         self.metrics_store = MetricsStore()
         self.hostname = socket.gethostname()
@@ -107,6 +108,7 @@ class MonitoringClient:
         self.metric_buffer = MetricBuffer()
         self.max_retries = 5
         self.retry_delay = 5  # seconds
+        self.last_collection_times = {}
         logger.info(f"MonitoringClient initialized with config: {self.config}")
 
     def load_config(self):
@@ -126,7 +128,7 @@ class MonitoringClient:
             logger.error("Config file not found. Using default configuration.")
             default_config = {
                 "server_url": "http://localhost:8888",
-                "interval": 60,
+                "default_interval": 60,
                 "metrics_dir": "./metrics",
                 "client_id": str(uuid.uuid4()),
                 "last_update": "0"
@@ -137,7 +139,7 @@ class MonitoringClient:
             logger.error("Invalid JSON in config file. Using default configuration.")
             default_config = {
                 "server_url": "http://localhost:8888",
-                "interval": 60,
+                "default_interval": 60,
                 "metrics_dir": "./metrics",
                 "client_id": str(uuid.uuid4()),
                 "last_update": "0"
@@ -169,15 +171,25 @@ class MonitoringClient:
                     logger.error(f"Error loading metric module {module_name}: {str(e)}")
         return modules
 
+    def get_metric_interval(self, metric_name):
+        return self.metric_intervals.get(metric_name, self.default_interval)
+
     def collect_metrics(self):
+        current_time = time.time()
+        collected_metrics = {}
         for name, module in self.metrics_modules.items():
-            try:
-                value = module.collect()
-                self.metrics_store.add_metric(name, value)
-                logger.info(f"Collected metric {name}: {value}")
-            except Exception as e:
-                logger.error(f"Error collecting metric {name}: {e}", exc_info=True)
-        return self.metrics_store.get_all_latest()
+            interval = self.get_metric_interval(name)
+            last_collection = self.last_collection_times.get(name, 0)
+            if current_time - last_collection >= interval:
+                try:
+                    value = module.collect()
+                    self.metrics_store.add_metric(name, value)
+                    collected_metrics[name] = value
+                    self.last_collection_times[name] = current_time
+                    logger.info(f"Collected metric {name}: {value}")
+                except Exception as e:
+                    logger.error(f"Error collecting metric {name}: {e}", exc_info=True)
+        return collected_metrics
 
     async def check_for_updates(self):
         try:
@@ -212,7 +224,7 @@ class MonitoringClient:
             initial_config = {
                 "client_id": self.client_id,
                 "config": {
-                    "interval": self.interval,
+                    "default_interval": self.default_interval,
                     "metrics_dir": self.config['metrics_dir'],
                     "tags": self.tags
                 }
@@ -238,7 +250,8 @@ class MonitoringClient:
 
         self.config.update(new_config)
 
-        self.interval = self.config.get('interval', 60)
+        self.default_interval = self.config.get('default_interval', 60)
+        self.metric_intervals = self.config.get('metric_intervals', {})
         self.metrics_dir = self.config.get('metrics_dir', './metrics')
         self.tags = self.config.get('tags', {})
         self.last_update = self.config.get('last_update', str(int(time.time())))
@@ -276,19 +289,7 @@ class MonitoringClient:
             sys.modules[metric_name] = module
             self.metrics_modules[metric_name] = module
 
-    async def send_metrics_once(self):
-        self.collect_metrics()
-        latest_metrics = self.metrics_store.get_all_latest()
-        metrics_to_send = {name: {'value': point.value, 'timestamp': point.timestamp}
-                           for name, point in latest_metrics.items() if point is not None}
-        data_to_send = {
-            "hostname": self.hostname,
-            "client_id": self.client_id,
-            "metrics": metrics_to_send,
-            "tags": self.tags
-        }
-        logger.info(f"Preparing to send metrics: {data_to_send}")
-
+    async def send_metrics(self, data_to_send):
         for attempt in range(self.max_retries):
             try:
                 client = tornado.httpclient.AsyncHTTPClient()
@@ -350,17 +351,26 @@ class MonitoringClient:
                 # Check for updates before sending metrics
                 await self.check_for_updates()
                 await self.fetch_new_metrics()
-                await self.send_metrics_once()
+
+                collected_metrics = self.collect_metrics()
+                if collected_metrics:
+                    data_to_send = {
+                        "hostname": self.hostname,
+                        "client_id": self.client_id,
+                        "metrics": {name: {'value': value, 'timestamp': time.time()} for name, value in collected_metrics.items()},
+                        "tags": self.tags
+                    }
+                    await self.send_metrics(data_to_send)
 
                 elapsed_time = time.time() - start_time
-                sleep_time = self.interval - elapsed_time
+                sleep_time = min(self.get_metric_interval(metric) for metric in self.metrics_modules.keys()) - elapsed_time
                 if sleep_time > 0:
                     await asyncio.sleep(sleep_time)
                 else:
-                    logger.warning(f"Metric collection took longer than interval: {elapsed_time:.2f} seconds")
+                    logger.warning(f"Metric collection took longer than shortest interval: {elapsed_time:.2f} seconds")
             except Exception as e:
                 logger.error(f"Error in main loop: {e}", exc_info=True)
-                await asyncio.sleep(self.interval)  # Wait before retrying
+                await asyncio.sleep(min(self.get_metric_interval(metric) for metric in self.metrics_modules.keys()))
 
 
 if __name__ == "__main__":
@@ -370,5 +380,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt. Shutting down...")
     finally:
-        client.metric_buffer.close()
-        logger.info("Client shut down successfully.")
+        client.metric

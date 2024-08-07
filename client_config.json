@@ -4,8 +4,13 @@
         "location": "data_center_1",
         "environment": "production"
     },
-    "interval": 60,
+    "default_interval": 60,
     "metrics_dir": "./metrics",
     "client_id": "84d629f2-87f2-4eaa-8e5d-39f05708d357",
-    "server_url": "http://localhost:8888"
+    "server_url": "http://localhost:8888",
+    "metric_intervals": {
+        "cpu_usage": 30,
+        "memory_usage": 45,
+        "disk_usage": 120
+    }
 }
