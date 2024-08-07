@@ -98,8 +98,10 @@ class FetchMetricsHandler(BaseHandler):
 
                 metrics = {row['name']: row['code'] for row in cursor.fetchall()}
 
+            self.set_header("Content-Type", "application/json")
             self.write(json.dumps(metrics))
         except Exception as e:
             logger.error(f"Error in FetchMetricsHandler: {str(e)}")
             self.set_status(500)
+            self.set_header("Content-Type", "application/json")
             self.write({"error": "Internal server error"})
