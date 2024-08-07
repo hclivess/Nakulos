@@ -1,18 +1,21 @@
 import tornado.web
-from handlers import (MainHandler, MetricsHandler, FetchLatestHandler,
-                      FetchHistoryHandler, FetchHostsHandler, AlertConfigHandler,
-                      AlertStateHandler, DowntimeHandler, RecentAlertsHandler,
-                      DashboardHandler, JSHandler, AggregateDataHandler, RemoveHostHandler,
-                      ClientConfigHandler, AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler,
-                      FetchMetricsHandler, UpdateTagsHandler, DeleteMetricsHandler, FetchMetricsForHostHandler,
-                      LoginHandler, RegisterHandler, LogoutHandler)
-
+from auth_handlers import LoginHandler, RegisterHandler, LogoutHandler
+from metric_handlers import (MetricsHandler, FetchLatestHandler, FetchHistoryHandler,
+                             FetchMetricsForHostHandler, DeleteMetricsHandler)
+from host_handlers import FetchHostsHandler, RemoveHostHandler, UpdateTagsHandler
+from alert_handlers import AlertConfigHandler, AlertStateHandler, RecentAlertsHandler
+from downtime_handlers import DowntimeHandler
+from admin_handlers import AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler
+from dashboard_handlers import DashboardHandler
+from client_handlers import ClientConfigHandler, FetchMetricsHandler
+from misc_handlers import MainHandler, JSHandler, AggregateDataHandler
 
 def make_app(metric_processor):
     return tornado.web.Application([
         (r"/", MainHandler),
         (r"/login", LoginHandler),
         (r"/register", RegisterHandler),
+        (r"/logout", LogoutHandler),
         (r"/fetch/metrics_for_host", FetchMetricsForHostHandler),
         (r"/fetch_metrics", FetchMetricsHandler),
         (r"/update_tags", UpdateTagsHandler),
@@ -38,8 +41,8 @@ def make_app(metric_processor):
         (r"/utils.js", JSHandler, {"filename": "utils.js"}),
         (r"/aggregate", AggregateDataHandler),
         (r"/remove_host", RemoveHostHandler),
-        (r"/logout", LogoutHandler),
-        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"})],
-        cookie_secret="YOUR_SECRET_KEY_HERE",  # Replace with a strong, random secret
-        login_url="/login"
+        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"})
+    ],
+    cookie_secret="YOUR_SECRET_KEY_HERE",
+    login_url="/login"
     )
