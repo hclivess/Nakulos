@@ -1,3 +1,4 @@
 /*.db
 /.idea
 /server/*.db
+/client/*.db
