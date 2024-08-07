@@ -43,6 +43,6 @@ def make_app(metric_processor, config):
         (r"/remove_host", RemoveHostHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"})
     ],
-    cookie_secret=config["webapp"]["secret_key"],
+    cookie_secret=config["webapp"]["cookie_secret"],
     login_url="/login"
     )
