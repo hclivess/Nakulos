@@ -202,8 +202,9 @@ function checkUrlForHost() {
         const hostSelect = document.getElementById('hostSelect');
         if (hostSelect) {
             hostSelect.value = hostParam;
-            updateDashboard(hostParam);
-            updateFormVisibility(hostParam);
+            updateDashboard(hostParam).then(() => {
+                updateFormVisibility(hostParam);
+            });
         }
     }
 }
