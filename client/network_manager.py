@@ -3,6 +3,8 @@ import json
 import logging
 import time
 import asyncio
+import hmac
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +14,22 @@ class NetworkManager:
         self.max_retries = 5
         self.retry_delay = 5  # seconds
 
+    def generate_signature(self, data):
+        message = json.dumps(data, sort_keys=True, separators=(',', ':'))
+        signature = hmac.new(self.config_manager.secret_key.encode(), message.encode(), hashlib.sha256).hexdigest()
+        return signature
+
     async def send_metrics(self, data_to_send):
+        signature = self.generate_signature(data_to_send)
+        headers = {'X-Signature': signature}
+
         for attempt in range(self.max_retries):
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
                         f"{self.config_manager.server_url}/metrics",
                         json=data_to_send,
+                        headers=headers,
                         timeout=10.0
                     ) as response:
                         response_json = await response.json()

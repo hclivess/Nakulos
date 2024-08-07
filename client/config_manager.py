@@ -12,6 +12,7 @@ class ConfigManager:
         self.config_file = config_file
         self.config = self.load_config()
         self.hostname = socket.gethostname()
+        self.secret_key = self.config['secret_key']
 
         if not self.config.get('client_id'):
             self.config['client_id'] = str(uuid.uuid4())

@@ -49,7 +49,7 @@ def main():
     logger.info(f"Started metric processor with {metric_processor.num_workers} workers")
 
     # Create Tornado application
-    app = make_app(metric_processor)
+    app = make_app(metric_processor, config=config)
 
     # Set up periodic callback for data aggregation (run daily)
     aggregation_callback = tornado.ioloop.PeriodicCallback(aggregate_data, 24 * 60 * 60 * 1000)  # 24 hours in milliseconds

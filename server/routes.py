@@ -10,7 +10,7 @@ from dashboard_handlers import DashboardHandler
 from client_handlers import ClientConfigHandler, FetchMetricsHandler
 from misc_handlers import MainHandler, JSHandler, AggregateDataHandler
 
-def make_app(metric_processor):
+def make_app(metric_processor, config):
     return tornado.web.Application([
         (r"/", MainHandler),
         (r"/login", LoginHandler),
@@ -23,7 +23,7 @@ def make_app(metric_processor):
         (r"/admin/update_client", UpdateClientHandler),
         (r"/admin/upload_metric", UploadMetricHandler),
         (r"/client_config", ClientConfigHandler),
-        (r"/metrics", MetricsHandler, dict(metric_processor=metric_processor)),
+        (r"/metrics", MetricsHandler, dict(metric_processor=metric_processor, secret_key=config['metrics']['secret_key'])),
         (r"/fetch/latest", FetchLatestHandler),
         (r"/fetch/history/([^/]+)/([^/]+)", FetchHistoryHandler),
         (r"/fetch/hosts", FetchHostsHandler),
@@ -43,6 +43,6 @@ def make_app(metric_processor):
         (r"/remove_host", RemoveHostHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "static"})
     ],
-    cookie_secret="YOUR_SECRET_KEY_HERE",
+    cookie_secret=config["webapp"]["secret_key"],
     login_url="/login"
     )

@@ -2,18 +2,36 @@ import json
 import time
 import logging
 from database import get_db
+import hmac
 from auth_handlers import BaseHandler
+import hashlib
 
 logger = logging.getLogger(__name__)
 
+
 class MetricsHandler(BaseHandler):
-    def initialize(self, metric_processor):
+    def initialize(self, metric_processor, secret_key):
         super().initialize()
         self.metric_processor = metric_processor
+        self.secret_key = secret_key
 
     async def post(self):
         try:
             data = json.loads(self.request.body)
+            signature = self.request.headers.get('X-Signature')
+
+            if not signature:
+                logger.warning("Metrics received without signature")
+                self.set_status(400)
+                self.write({"error": "Signature is required"})
+                return
+
+            if not self.verify_signature(data, signature):
+                logger.warning("Invalid signature for metrics")
+                self.set_status(400)
+                self.write({"error": "Invalid signature"})
+                return
+
             hostname = data['hostname']
             metrics = data['metrics']
             tags = data.get('tags', {})
@@ -40,6 +58,11 @@ class MetricsHandler(BaseHandler):
             logger.error(f"Error in MetricsHandler: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
+
+    def verify_signature(self, data, signature):
+        message = json.dumps(data, sort_keys=True, separators=(',', ':'))
+        expected_signature = hmac.new(self.secret_key.encode(), message.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(signature, expected_signature)
 
 class FetchLatestHandler(BaseHandler):
     async def get(self):
