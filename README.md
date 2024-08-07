@@ -2,6 +2,8 @@
 
 This is an advanced, scalable monitoring system built with Python and Tornado. It consists of a server that collects and stores metrics, and a client that gathers and sends metrics to the server.
 
+![Alt Text](thumb.jpg)
+
 ## Features
 
 - 100% Python implementation - absolutely no PHP or other legacy languages in sight
