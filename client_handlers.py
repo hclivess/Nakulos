@@ -4,6 +4,7 @@ from auth_handlers import BaseHandler
 
 logger = logging.getLogger(__name__)
 
+
 class ClientConfigHandler(BaseHandler):
     async def get(self):
         client_id = self.get_argument('client_id', None)
@@ -19,15 +20,20 @@ class ClientConfigHandler(BaseHandler):
 
             if result:
                 config, last_updated = result['config'], result['last_updated']
-                self.write({
-                    "status": "update_available" if str(last_updated) > self.get_argument('last_update', '0') else "no_update",
-                    "config": config
-                })
+                client_last_update = self.get_argument('last_update', '0')
+                logger.info(f"Client last update: {client_last_update}, Server last updated: {last_updated}")
+                if str(last_updated.timestamp()) > client_last_update:
+                    self.write({
+                        "status": "update_available",
+                        "config": config
+                    })
+                else:
+                    self.write({"status": "no_update"})
             else:
                 self.set_status(404)
                 self.write({"status": "unknown_client"})
         except Exception as e:
-            logger.error(f"Error in ClientConfigHandler: {str(e)}")
+            logger.error(f"Error in ClientConfigHandler GET: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
 
@@ -44,16 +50,24 @@ class ClientConfigHandler(BaseHandler):
 
         try:
             with self.db.get_cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO client_configs (client_id, config, tags)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (client_id) DO UPDATE
-                    SET config = EXCLUDED.config, tags = EXCLUDED.tags, last_updated = NOW()
-                """, (client_id, json.dumps(new_config), json.dumps(tags)))
+                # First, get the current config
+                cursor.execute("SELECT config FROM client_configs WHERE client_id = %s", (client_id,))
+                result = cursor.fetchone()
 
-            self.write({"status": "success", "message": "Client registered successfully"})
+                if result and result['config'] == json.dumps(new_config):
+                    # Config hasn't changed, don't update last_updated
+                    self.write({"status": "success", "message": "No changes to config"})
+                else:
+                    # Config has changed or is new, update everything including last_updated
+                    cursor.execute("""
+                        INSERT INTO client_configs (client_id, config, tags, last_updated)
+                        VALUES (%s, %s, %s, NOW())
+                        ON CONFLICT (client_id) DO UPDATE
+                        SET config = EXCLUDED.config, tags = EXCLUDED.tags, last_updated = NOW()
+                    """, (client_id, json.dumps(new_config), json.dumps(tags)))
+                    self.write({"status": "success", "message": "Client config updated successfully"})
         except Exception as e:
-            logger.error(f"Error registering client: {str(e)}")
+            logger.error(f"Error in ClientConfigHandler POST: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
 

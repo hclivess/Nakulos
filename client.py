@@ -148,9 +148,10 @@ class MonitoringClient:
             return default_config
 
     def save_config(self, config):
+        config['last_update'] = self.last_update
         with open('client_config.json', 'w') as config_file:
             json.dump(config, config_file, indent=4)
-        logger.info("Saved new configuration to client_config.json")
+        logger.info(f"Saved new configuration to client_config.json with last_update: {self.last_update}")
 
     def load_metric_modules(self):
         modules = {}
@@ -206,6 +207,11 @@ class MonitoringClient:
                     new_config = response_data.get('config')
                     logger.info("New configuration received")
                     self.apply_new_config(new_config)
+                    # Update last_update only when a new config is actually received and applied
+                    new_last_update = str(int(time.time()))
+                    logger.info(f"Updating last_update from {self.last_update} to {new_last_update}")
+                    self.last_update = new_last_update
+                    self.save_config(self.config)
                 elif status == 'no_update':
                     logger.info("No new updates available")
                 else:
@@ -254,12 +260,11 @@ class MonitoringClient:
         self.metric_intervals = self.config.get('metric_intervals', {})
         self.metrics_dir = self.config.get('metrics_dir', './metrics')
         self.tags = self.config.get('tags', {})
-        self.last_update = self.config.get('last_update', str(int(time.time())))
 
         if self.metrics_dir != self.config.get('metrics_dir'):
             self.metrics_modules = self.load_metric_modules()
 
-        self.save_config(new_config)
+        self.save_config(self.config)
         logger.info("Applied new configuration")
 
     async def fetch_new_metrics(self):
@@ -372,7 +377,6 @@ class MonitoringClient:
                 logger.error(f"Error in main loop: {e}", exc_info=True)
                 await asyncio.sleep(min(self.get_metric_interval(metric) for metric in self.metrics_modules.keys()))
 
-
 if __name__ == "__main__":
     client = MonitoringClient()
     try:
@@ -380,4 +384,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt. Shutting down...")
     finally:
-        client.metric
+        client.metric_buffer.close()
+        logger.info("Client shut down successfully.")
