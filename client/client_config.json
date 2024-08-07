@@ -6,14 +6,14 @@
     },
     "interval": 60,
     "metrics_dir": "./metrics",
-    "client_id": "84d629f2-87f2-4eaa-8e5d-39f05708d357",
+    "client_id": "1d0e5b4f-628a-4739-9889-9c6a55a43225",
     "server_url": "http://localhost:8888",
-    "last_update": "1723059428",
+    "last_update": "1723064254",
     "default_interval": 60,
     "secret_key": "your_very_secret_key_here",
-        "metric_intervals": {
-                                "cpu_usage": 30,
-                                "memory_usage": 45,
-                                "disk_usage": 120
-                            }
+    "metric_intervals": {
+        "cpu_usage": 30,
+        "memory_usage": 45,
+        "disk_usage": 120
+    }
 }

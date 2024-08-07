@@ -2,6 +2,7 @@ import aiohttp
 import json
 import logging
 import time
+import asyncio
 
 logger = logging.getLogger(__name__)
 

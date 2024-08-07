@@ -6,12 +6,18 @@ import time
 
 logger = logging.getLogger(__name__)
 
+
 class ConfigManager:
     def __init__(self, config_file='client_config.json'):
         self.config_file = config_file
         self.config = self.load_config()
         self.hostname = socket.gethostname()
-        self.client_id = self.config.get('client_id', str(uuid.uuid4()))
+
+        if not self.config.get('client_id'):
+            self.config['client_id'] = str(uuid.uuid4())
+            self.save_config(self.config)
+
+        self.client_id = self.config['client_id']
         self.server_url = self.config['server_url']
         self.default_interval = self.config.get('default_interval', 60)
         self.metric_intervals = self.config.get('metric_intervals', {})
@@ -44,17 +50,22 @@ class ConfigManager:
         return default_config
 
     def save_config(self, config):
-        config['last_update'] = self.last_update
+        if hasattr(self, 'last_update'):
+            config['last_update'] = self.last_update
         with open(self.config_file, 'w') as config_file:
             json.dump(config, config_file, indent=4)
         logger.info(f"Saved new configuration to {self.config_file}")
 
     def update_config(self, new_config):
         self.config.update(new_config)
+        if not self.config.get('client_id'):
+            self.config['client_id'] = str(uuid.uuid4())
+        self.client_id = self.config['client_id']
         self.default_interval = self.config.get('default_interval', 60)
         self.metric_intervals = self.config.get('metric_intervals', {})
         self.metrics_dir = self.config.get('metrics_dir', './metrics')
         self.tags = self.config.get('tags', {})
+        self.last_update = self.config.get('last_update', self.last_update)
         self.save_config(self.config)
 
     def set_last_update(self, timestamp):
