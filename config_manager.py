@@ -42,15 +42,15 @@ class ConfigManager:
             logger.error(f"Invalid JSON in config file: {self.config_file}. Using default configuration.")
             return self.get_default_config()
 
-    def get_default_config(self): #todo adjust this
+    def get_default_config(self):
         default_config = {
             "server_url": "http://localhost:8888",
             "default_interval": 60,
-            "metrics_dir": os.path.join(os.path.dirname(__file__), 'metrics'),
+            "metrics_dir": 'metrics',
             "client_id": str(uuid.uuid4()),
-            "secret_key": str(uuid.uuid4()),
+            "secret_key": "your_secret_key",
             "last_update": "0",
-            "active_metrics": []
+            "active_metrics": ["cpu_usage", "disk_usage", "memory_usage"]
         }
         self.save_config(default_config)
         return default_config
