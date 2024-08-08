@@ -20,26 +20,28 @@ class UpdateClientHandler(BaseHandler):
     def post(self):
         data = json.loads(self.request.body)
         client_id = data.get('client_id')
+        hostname = data.get('hostname')
         config = data.get('config')
 
-        if not client_id or not config:
+        if not client_id or not hostname or not config:
             self.set_status(400)
-            self.write({"message": "Both client_id and config are required"})
+            self.write({"message": "client_id, hostname, and config are required"})
             return
 
         try:
             with self.db.get_cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO client_configs (client_id, config)
-                    VALUES (%s, %s)
+                    INSERT INTO client_configs (client_id, hostname, config)
+                    VALUES (%s, %s, %s)
                     ON CONFLICT (client_id) DO UPDATE
-                    SET config = EXCLUDED.config, last_updated = NOW()
-                """, (client_id, json.dumps(config)))
+                    SET hostname = EXCLUDED.hostname, config = EXCLUDED.config, last_updated = NOW()
+                """, (client_id, hostname, json.dumps(config)))
             self.write({"message": "Client configuration updated successfully"})
         except Exception as e:
             logger.error(f"Error updating client configuration: {str(e)}")
             self.set_status(500)
             self.write({"message": "Internal server error"})
+
 
 class UploadMetricHandler(BaseHandler):
     def post(self):

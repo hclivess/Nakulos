@@ -141,6 +141,7 @@ def init_db(config):
             ("client_configs", '''
                 CREATE TABLE IF NOT EXISTS client_configs (
                     client_id VARCHAR(255) PRIMARY KEY,
+                    hostname VARCHAR(255) NOT NULL,
                     config JSONB NOT NULL,
                     tags JSONB,
                     last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

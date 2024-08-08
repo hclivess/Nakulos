@@ -24,15 +24,17 @@ async function fetchMetricsForHost(hostname) {
 document.getElementById('updateClientForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const clientId = document.getElementById('clientId').value;
+    const hostname = document.getElementById('hostname').value;
     const configJson = document.getElementById('configJson').value;
 
     try {
+        const config = JSON.parse(configJson);
         const response = await fetch('/admin/update_client', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ client_id: clientId, config: JSON.parse(configJson) }),
+            body: JSON.stringify({ client_id: clientId, hostname: hostname, config: config }),
         });
 
         if (response.ok) {
@@ -46,6 +48,7 @@ document.getElementById('updateClientForm').addEventListener('submit', async (ev
         alert('An error occurred while updating client configuration');
     }
 });
+
 
 // Event listener for uploading new metric
 document.getElementById('uploadMetricForm').addEventListener('submit', async (event) => {
@@ -63,7 +66,7 @@ document.getElementById('uploadMetricForm').addEventListener('submit', async (ev
             body: JSON.stringify({
                 name: metricName,
                 code: metricCode,
-                tags: targetTags ? JSON.parse(targetTags) : {}
+                tags: targetTags ? JSON.pdarse(targetTags) : {}
             }),
         });
 

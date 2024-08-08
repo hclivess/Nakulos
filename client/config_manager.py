@@ -59,16 +59,15 @@ class ConfigManager:
 
     def update_config(self, new_config):
         self.config.update(new_config)
-        if not self.config.get('client_id'):
-            self.config['client_id'] = str(uuid.uuid4())
         self.client_id = self.config['client_id']
+        self.hostname = self.config.get('hostname', socket.gethostname())
         self.default_interval = self.config.get('default_interval', 60)
         self.metric_intervals = self.config.get('metric_intervals', {})
         self.metrics_dir = self.config.get('metrics_dir', './metrics')
         self.tags = self.config.get('tags', {})
         self.last_update = self.config.get('last_update', self.last_update)
         self.save_config(self.config)
-
+        ad
     def set_last_update(self, timestamp):
         self.last_update = str(int(timestamp))
         self.save_config(self.config)

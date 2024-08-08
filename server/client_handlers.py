@@ -40,12 +40,13 @@ class ClientConfigHandler(BaseHandler):
     async def post(self):
         data = json.loads(self.request.body)
         client_id = data.get('client_id')
+        hostname = data.get('hostname')
         new_config = data.get('config')
         tags = data.get('tags', {})
 
-        if not client_id or not new_config:
+        if not client_id or not hostname or not new_config:
             self.set_status(400)
-            self.write({"error": "Both client_id and config are required"})
+            self.write({"error": "client_id, hostname, and config are required"})
             return
 
         try:
@@ -60,11 +61,11 @@ class ClientConfigHandler(BaseHandler):
                 else:
                     # Config has changed or is new, update everything including last_updated
                     cursor.execute("""
-                        INSERT INTO client_configs (client_id, config, tags, last_updated)
-                        VALUES (%s, %s, %s, NOW())
+                        INSERT INTO client_configs (client_id, hostname, config, tags, last_updated)
+                        VALUES (%s, %s, %s, %s, NOW())
                         ON CONFLICT (client_id) DO UPDATE
-                        SET config = EXCLUDED.config, tags = EXCLUDED.tags, last_updated = NOW()
-                    """, (client_id, json.dumps(new_config), json.dumps(tags)))
+                        SET hostname = EXCLUDED.hostname, config = EXCLUDED.config, tags = EXCLUDED.tags, last_updated = NOW()
+                    """, (client_id, hostname, json.dumps(new_config), json.dumps(tags)))
                     self.write({"status": "success", "message": "Client config updated successfully"})
         except Exception as e:
             logger.error(f"Error in ClientConfigHandler POST: {str(e)}")
