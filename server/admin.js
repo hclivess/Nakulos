@@ -90,7 +90,7 @@ document.getElementById('uploadMetricForm').addEventListener('submit', async (ev
             body: JSON.stringify({
                 name: metricName,
                 code: metricCode,
-                tags: targetTags ? JSON.pdarse(targetTags) : {}
+                tags: targetTags ? JSON.parse(targetTags) : {}
             }),
         });
 
