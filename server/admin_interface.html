@@ -9,26 +9,29 @@
 <body>
     <div class="container mt-4">
         <nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="/admin">Admin Panel</a>
-    <div class="navbar-nav">
-      <a class="nav-link" href="/dashboard">Monitoring Dashboard</a>
-              <a class="nav-link" href="/logout" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
-
-    </div>
-  </div>
-</nav>
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/admin">Admin Panel</a>
+                <div class="navbar-nav">
+                    <a class="nav-link" href="/dashboard">Monitoring Dashboard</a>
+                    <a class="nav-link" href="/logout" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
+                </div>
+            </div>
+        </nav>
         <div class="row">
             <div class="col-md-6">
                 <h2>Update Client Configuration</h2>
                 <form id="updateClientForm">
                     <div class="mb-3">
-                        <label for="clientId" class="form-label">Client ID:</label>
-                        <select id="clientId" class="form-select" required>
+                        <label for="hostname" class="form-label">Hostname:</label>
+                        <select id="hostname" class="form-select" required>
                             {% for host in hosts %}
                                 <option value="{{ host }}">{{ host }}</option>
                             {% end %}
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="clientId" class="form-label">Client ID:</label>
+                        <input type="text" id="clientId" class="form-control" required>
                     </div>
                     <div class="mb-3">
                         <label for="configJson" class="form-label">Configuration JSON:</label>
