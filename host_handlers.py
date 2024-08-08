@@ -1,5 +1,6 @@
-import json
 import logging
+import json
+import traceback
 from auth_handlers import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -54,19 +55,6 @@ class RemoveHostHandler(BaseHandler):
             logger.error(f"Error in RemoveHostHandler: {str(e)}")
             self.set_status(500)
             self.write(json.dumps({"error": "Internal server error"}))
-
-import json
-import logging
-from auth_handlers import BaseHandler
-
-logger = logging.getLogger(__name__)
-
-import json
-import logging
-import traceback
-from auth_handlers import BaseHandler
-
-logger = logging.getLogger(__name__)
 
 class UpdateTagsHandler(BaseHandler):
     async def post(self):

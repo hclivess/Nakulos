@@ -7,7 +7,6 @@ import json
 
 logger = logging.getLogger(__name__)
 
-
 class Database:
     def __init__(self, config):
         self.config = config
@@ -49,7 +48,6 @@ class Database:
             self.conn = None
             logger.info("Database connection closed")
 
-
 def create_database_if_not_exists(config):
     conn = None
     try:
@@ -81,9 +79,7 @@ def create_database_if_not_exists(config):
         if conn:
             conn.close()
 
-
 db = None
-
 
 def init_db(config):
     global db
@@ -104,7 +100,7 @@ def init_db(config):
             ("metrics", '''
                 CREATE TABLE IF NOT EXISTS metrics (
                     id SERIAL PRIMARY KEY,
-                    host_id INTEGER REFERENCES hosts(id),
+                    host_id INTEGER REFERENCES hosts(id) ON DELETE CASCADE,
                     metric_name VARCHAR(255) NOT NULL,
                     timestamp FLOAT NOT NULL,
                     value FLOAT NOT NULL
@@ -113,7 +109,7 @@ def init_db(config):
             ("alerts", '''
                 CREATE TABLE IF NOT EXISTS alerts (
                     id SERIAL PRIMARY KEY,
-                    host_id INTEGER REFERENCES hosts(id),
+                    host_id INTEGER REFERENCES hosts(id) ON DELETE CASCADE,
                     metric_name VARCHAR(255) NOT NULL,
                     condition VARCHAR(50) NOT NULL,
                     threshold FLOAT NOT NULL,
@@ -124,7 +120,7 @@ def init_db(config):
             ("downtimes", '''
                 CREATE TABLE IF NOT EXISTS downtimes (
                     id SERIAL PRIMARY KEY,
-                    host_id INTEGER REFERENCES hosts(id),
+                    host_id INTEGER REFERENCES hosts(id) ON DELETE CASCADE,
                     start_time FLOAT NOT NULL,
                     end_time FLOAT NOT NULL
                 )
@@ -132,8 +128,8 @@ def init_db(config):
             ("alert_history", '''
                 CREATE TABLE IF NOT EXISTS alert_history (
                     id SERIAL PRIMARY KEY,
-                    host_id INTEGER REFERENCES hosts(id),
-                    alert_id INTEGER REFERENCES alerts(id),
+                    host_id INTEGER REFERENCES hosts(id) ON DELETE CASCADE,
+                    alert_id INTEGER REFERENCES alerts(id) ON DELETE CASCADE,
                     timestamp FLOAT NOT NULL,
                     value FLOAT NOT NULL
                 )
@@ -173,10 +169,8 @@ def init_db(config):
 
     logger.info("All necessary tables have been processed")
 
-
 def get_db():
     return db
-
 
 def load_config(config_path='server_config.json'):
     try:
@@ -189,13 +183,10 @@ def load_config(config_path='server_config.json'):
         logger.error(f"Invalid JSON in config file: {config_path}")
         raise
 
-
-
 def setup_database():
     config = load_config()
     init_db(config['database'])
     logger.info("Database setup completed")
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

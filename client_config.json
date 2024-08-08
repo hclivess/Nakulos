@@ -1,10 +1,15 @@
 {
     "server_url": "http://localhost:8888",
     "default_interval": 60,
-    "metrics_dir": "C:\\Users\\1kuceraj\\PycharmProjects\\Scanopse\\metrics",
+    "metrics_dir": "metrics",
+        "metric_intervals": {
+        "cpu_usage": 30,
+        "memory_usage": 60,
+        "disk_usage": 300
+    },
     "client_id": "bcff1bc5-251b-42b7-9acc-50d5b221d70a",
     "secret_key": "your_very_secret_key_here",
-    "last_update": "1723151354",
+    "last_update": "1723154841",
     "active_metrics": [
         "cpu_usage"
     ],

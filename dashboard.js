@@ -3,7 +3,7 @@ import { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState
 import { updateDowntimes, addDowntime, deleteDowntime } from './downtimes.js';
 import { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility } from './utils.js';
 
-let chart;
+let charts = {};
 
 // Define a set of repeating vibrant colors
 const vibrantColors = [
@@ -127,12 +127,14 @@ async function updateDashboard(hostname) {
     console.log('Updating dashboard...');
     console.log('Selected hostname:', hostname);
 
-    let charts = {};
+    // Clear existing charts
+    const chartContainer = document.getElementById('chartContainer');
+    chartContainer.innerHTML = '';
+    Object.values(charts).forEach(chart => chart.destroy());
+    charts = {};
 
     if (hostname === 'all') {
         document.getElementById('hostInfo').style.display = 'none';
-        document.getElementById('chartContainer').innerHTML = '';
-        Object.values(charts).forEach(chart => chart.destroy());
     } else {
         document.getElementById('hostInfo').style.display = 'block';
         const latestMetrics = await fetchLatestMetrics();
@@ -146,9 +148,6 @@ async function updateDashboard(hostname) {
 
             const startDate = new Date(document.getElementById('startDate').value);
             const endDate = new Date(document.getElementById('endDate').value);
-
-            const chartContainer = document.getElementById('chartContainer');
-            chartContainer.innerHTML = '';
 
             const datasets = {};
             const fetchPromises = metricNames.map(async (metric, index) => {
@@ -167,26 +166,43 @@ async function updateDashboard(hostname) {
             for (const metric of metricNames) {
                 const chartDiv = document.createElement('div');
                 chartDiv.className = 'col-12';
-                chartDiv.style.height = '400px'; // Set a fixed height for the chart container
+                chartDiv.style.height = '400px';
                 chartDiv.innerHTML = `<canvas id="${metric}Chart"></canvas>`;
                 chartContainer.appendChild(chartDiv);
             }
 
-            // Delay the chart initialization/update to ensure canvas elements are available
-            setTimeout(() => {
-                for (const metric of metricNames) {
-                    if (charts[metric]) {
-                        charts[metric] = updateChart(charts[metric], metric, [datasets[metric]], startDate, endDate);
-                    } else {
-                        charts[metric] = initChart(metric, [datasets[metric]]);
+            // Create new chart instances
+            for (const metric of metricNames) {
+                const ctx = document.getElementById(`${metric}Chart`).getContext('2d');
+                charts[metric] = new Chart(ctx, {
+                    type: 'line',
+                    data: { datasets: [datasets[metric]] },
+                    options: {
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: { unit: 'minute' },
+                                title: { display: true, text: 'Time' },
+                                ticks: { autoSkip: true, maxTicksLimit: 20 }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Value' },
+                                ticks: { autoSkip: true, maxTicksLimit: 10 }
+                            }
+                        },
+                        plugins: {
+                            title: { display: true, text: `${metric} Over Time` },
+                            legend: { position: 'top' }
+                        },
+                        responsive: true,
+                        maintainAspectRatio: false
                     }
-                }
-            }, 100); // Adjust the delay as needed
+                });
+            }
         } else {
             console.error(`No data found for hostname: ${hostname}`);
             updateHostInfo(hostname, {});
-            document.getElementById('chartContainer').innerHTML = '';
-            Object.values(charts).forEach(chart => chart.destroy());
         }
     }
 

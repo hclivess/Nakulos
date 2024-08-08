@@ -50,7 +50,8 @@ class ConfigManager:
             "client_id": str(uuid.uuid4()),
             "secret_key": "your_secret_key",
             "last_update": "0",
-            "active_metrics": ["cpu_usage", "disk_usage", "memory_usage"]
+            "active_metrics": ["cpu_usage", "disk_usage", "memory_usage"],
+            "tags" : {"role": "server"}
         }
         self.save_config(default_config)
         return default_config
