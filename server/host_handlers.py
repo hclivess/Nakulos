@@ -55,31 +55,73 @@ class RemoveHostHandler(BaseHandler):
             self.set_status(500)
             self.write(json.dumps({"error": "Internal server error"}))
 
+import json
+import logging
+from auth_handlers import BaseHandler
+
+logger = logging.getLogger(__name__)
+
+import json
+import logging
+import traceback
+from auth_handlers import BaseHandler
+
+logger = logging.getLogger(__name__)
+
 class UpdateTagsHandler(BaseHandler):
     async def post(self):
-        data = json.loads(self.request.body)
-        hostname = data.get('hostname')
-        new_tags = data.get('tags')
-
-        if not hostname or new_tags is None:
-            self.set_status(400)
-            self.write({"error": "Both hostname and tags are required"})
-            return
-
         try:
-            with self.db.get_cursor() as cursor:
-                cursor.execute("""
-                    UPDATE hosts
-                    SET tags = %s
-                    WHERE hostname = %s
-                """, (json.dumps(new_tags), hostname))
+            data = json.loads(self.request.body)
+            hostname = data.get('hostname')
+            new_tags = data.get('tags')
 
-                if cursor.rowcount == 0:
+            logger.info(f"Received update tags request for hostname: {hostname}, new tags: {new_tags}")
+
+            if not hostname or new_tags is None:
+                self.set_status(400)
+                self.write({"error": "Both hostname and tags are required"})
+                return
+
+            with self.db.get_cursor() as cursor:
+                # First, get the current client configuration
+                cursor.execute("""
+                    SELECT client_id, config
+                    FROM client_configs
+                    WHERE hostname = %s
+                """, (hostname,))
+                result = cursor.fetchone()
+
+                if not result:
                     self.set_status(404)
-                    self.write({"error": "Host not found"})
-                else:
-                    self.write({"message": "Tags updated successfully"})
+                    self.write({"error": f"Host not found: {hostname}"})
+                    return
+
+                client_id, current_config = result['client_id'], result['config']
+
+                # If current_config is a string, parse it to a dictionary
+                if isinstance(current_config, str):
+                    current_config = json.loads(current_config)
+                elif not isinstance(current_config, dict):
+                    current_config = {}
+
+                logger.info(f"Current config for {hostname}: {current_config}")
+
+                # Update the tags in the configuration
+                current_config['tags'] = new_tags
+
+                # Convert the updated config back to a JSON string
+                updated_config_json = json.dumps(current_config)
+
+                # Update the client configuration with the new tags
+                cursor.execute("""
+                    UPDATE client_configs
+                    SET config = %s, last_updated = NOW()
+                    WHERE client_id = %s
+                """, (updated_config_json, client_id))
+
+            self.write({"message": f"Client configuration updated with new tags for {hostname}. Client will fetch on next check."})
         except Exception as e:
-            logger.error(f"Error updating tags: {str(e)}")
+            logger.error(f"Error updating client configuration with new tags: {str(e)}")
+            logger.error(traceback.format_exc())
             self.set_status(500)
-            self.write({"error": "Internal server error"})
+            self.write({"error": f"Internal server error: {str(e)}"})

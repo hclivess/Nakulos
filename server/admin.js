@@ -209,6 +209,46 @@ document.getElementById('deleteMetricsForm').addEventListener('submit', async (e
     }
 });
 
+// Event listener for updating host tags
+document.getElementById('updateTagsForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const hostname = document.getElementById('tagHostname').value;
+    let newTags;
+    try {
+        newTags = JSON.parse(document.getElementById('newTags').value);
+
+        // Ensure newTags is an object
+        if (typeof newTags !== 'object' || newTags === null || Array.isArray(newTags)) {
+            throw new Error('Tags must be a valid JSON object');
+        }
+    } catch (error) {
+        alert(`Invalid JSON format for tags: ${error.message}. Please enter a valid JSON object.`);
+        return;
+    }
+
+    try {
+        const response = await fetch('/update_tags', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ hostname, tags: newTags }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(result.message);
+        } else {
+            console.error('Error response:', result);
+            alert(`Failed to update tags: ${result.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error updating tags:', error);
+        alert(`An error occurred while updating tags: ${error.message}`);
+    }
+});
+
 // Initialize the page
 document.addEventListener('DOMContentLoaded', () => {
     // Fetch metrics for the initially selected host
