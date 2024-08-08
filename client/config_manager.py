@@ -67,7 +67,7 @@ class ConfigManager:
         self.tags = self.config.get('tags', {})
         self.last_update = self.config.get('last_update', self.last_update)
         self.save_config(self.config)
-        ad
+
     def set_last_update(self, timestamp):
         self.last_update = str(int(timestamp))
         self.save_config(self.config)
