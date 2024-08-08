@@ -4,6 +4,18 @@ from auth_handlers import BaseHandler
 
 logger = logging.getLogger(__name__)
 
+class FetchClientIdsHandler(BaseHandler):
+    async def get(self):
+        try:
+            with self.db.get_cursor() as cursor:
+                cursor.execute("SELECT client_id FROM client_configs")
+                client_ids = [row['client_id'] for row in cursor.fetchall()]
+            self.write(json.dumps(client_ids))
+        except Exception as e:
+            logger.error(f"Error in FetchClientIdsHandler: {str(e)}")
+            self.set_status(500)
+            self.write({"error": "Internal server error"})
+
 class AdminInterfaceHandler(BaseHandler):
     def get(self):
         try:

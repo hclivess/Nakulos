@@ -5,7 +5,7 @@ from metric_handlers import (MetricsHandler, FetchLatestHandler, FetchHistoryHan
 from host_handlers import FetchHostsHandler, RemoveHostHandler, UpdateTagsHandler
 from alert_handlers import AlertConfigHandler, AlertStateHandler, RecentAlertsHandler
 from downtime_handlers import DowntimeHandler
-from admin_handlers import AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler
+from admin_handlers import AdminInterfaceHandler, UpdateClientHandler, UploadMetricHandler, FetchClientIdsHandler
 from dashboard_handlers import DashboardHandler
 from client_handlers import ClientConfigHandler, FetchMetricsHandler
 from misc_handlers import MainHandler, JSHandler, AggregateDataHandler
@@ -13,6 +13,7 @@ from misc_handlers import MainHandler, JSHandler, AggregateDataHandler
 def make_app(metric_processor, config):
     return tornado.web.Application([
         (r"/", MainHandler),
+        (r"/fetch_client_ids", FetchClientIdsHandler),
         (r"/login", LoginHandler),
         (r"/register", RegisterHandler),
         (r"/logout", LogoutHandler),

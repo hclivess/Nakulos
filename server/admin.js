@@ -1,3 +1,27 @@
+// Function to fetch client IDs and populate the dropdown
+async function fetchClientIds() {
+    try {
+        const response = await fetch('/fetch_client_ids');
+        if (response.ok) {
+            const clientIds = await response.json();
+            const clientIdSelect = document.getElementById('clientId');
+            clientIds.forEach(clientId => {
+                const option = document.createElement('option');
+                option.value = clientId;
+                option.textContent = clientId;
+                clientIdSelect.appendChild(option);
+            });
+        } else {
+            console.error('Failed to fetch client IDs');
+        }
+    } catch (error) {
+        console.error('Error fetching client IDs:', error);
+    }
+}
+
+// Call the fetchClientIds function when the page loads
+document.addEventListener('DOMContentLoaded', fetchClientIds);
+
 // Function to fetch metrics for a selected host
 async function fetchMetricsForHost(hostname) {
     try {
