@@ -78,6 +78,7 @@ class NetworkManager:
             async with aiohttp.ClientSession() as session:
                 initial_config = {
                     "client_id": self.config_manager.client_id,
+                    "hostname": self.config_manager.hostname,  # Include the hostname
                     "config": {
                         "default_interval": self.config_manager.default_interval,
                         "metrics_dir": self.config_manager.metrics_dir,
@@ -85,8 +86,8 @@ class NetworkManager:
                     }
                 }
                 async with session.post(
-                    f"{self.config_manager.server_url}/client_config",
-                    json=initial_config
+                        f"{self.config_manager.server_url}/client_config",
+                        json=initial_config
                 ) as response:
                     if response.status == 200:
                         logger.info("Client registered successfully")
