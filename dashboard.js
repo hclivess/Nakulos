@@ -4,8 +4,8 @@ import { updateDowntimes, addDowntime, deleteDowntime } from './downtimes.js';
 import { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility } from './utils.js';
 
 let charts = {};
+let realtimeUpdateInterval;
 
-// Define a set of repeating vibrant colors
 const vibrantColors = [
     '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
     '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
@@ -79,14 +79,32 @@ function updateHostInfo(hostname, tags) {
 }
 
 function setupTimeRangeButtons() {
-    const timeRanges = ['hour', 'day', 'week', 'month'];
+    const timeRanges = ['realtime', 'hour', 'day', 'week', 'month'];
     timeRanges.forEach(range => {
-        document.getElementById(`last${range.charAt(0).toUpperCase() + range.slice(1)}Button`)
-            .addEventListener('click', () => {
+        const button = document.getElementById(`last${range.charAt(0).toUpperCase() + range.slice(1)}Button`);
+        if (button) {
+            button.addEventListener('click', () => {
                 setTimeRange(range);
-                updateDashboard(document.querySelector('#hostSelector select').value);
+                const selectedHostname = document.querySelector('#hostSelector select').value;
+                updateDashboard(selectedHostname);
+                if (range === 'realtime') {
+                    setupRealtimeUpdate();
+                } else {
+                    clearInterval(realtimeUpdateInterval);
+                }
             });
+        } else {
+            console.warn(`Button for ${range} not found`);
+        }
     });
+}
+
+function setupRealtimeUpdate() {
+    clearInterval(realtimeUpdateInterval);
+    realtimeUpdateInterval = setInterval(() => {
+        const hostname = document.querySelector('#hostSelector select').value;
+        updateDashboard(hostname, true);
+    }, 5000);  // Update every 5 seconds
 }
 
 async function removeSelectedHost() {
@@ -108,7 +126,6 @@ async function removeSelectedHost() {
 
             if (response.ok) {
                 alert(`Host "${selectedHostname}" has been removed successfully.`);
-                // Refresh the host list and update the dashboard
                 const hosts = await fetchHosts();
                 createHostSelector(hosts);
                 await updateDashboard('all');
@@ -123,18 +140,15 @@ async function removeSelectedHost() {
     }
 }
 
-async function updateDashboard(hostname) {
+async function updateDashboard(hostname, isRealtimeUpdate = false) {
     console.log('Updating dashboard...');
     console.log('Selected hostname:', hostname);
 
-    // Clear existing charts
-    const chartContainer = document.getElementById('chartContainer');
-    chartContainer.innerHTML = '';
-    Object.values(charts).forEach(chart => chart.destroy());
-    charts = {};
-
     if (hostname === 'all') {
         document.getElementById('hostInfo').style.display = 'none';
+        document.getElementById('chartContainer').innerHTML = '';
+        Object.values(charts).forEach(chart => chart.destroy());
+        charts = {};
     } else {
         document.getElementById('hostInfo').style.display = 'block';
         const latestMetrics = await fetchLatestMetrics();
@@ -163,16 +177,19 @@ async function updateDashboard(hostname) {
 
             await Promise.all(fetchPromises);
 
+            document.getElementById('chartContainer').innerHTML = '';
             for (const metric of metricNames) {
                 const chartDiv = document.createElement('div');
                 chartDiv.className = 'col-12';
                 chartDiv.style.height = '400px';
                 chartDiv.innerHTML = `<canvas id="${metric}Chart"></canvas>`;
-                chartContainer.appendChild(chartDiv);
+                document.getElementById('chartContainer').appendChild(chartDiv);
             }
 
-            // Create new chart instances
             for (const metric of metricNames) {
+                if (charts[metric]) {
+                    charts[metric].destroy();
+                }
                 const ctx = document.getElementById(`${metric}Chart`).getContext('2d');
                 charts[metric] = new Chart(ctx, {
                     type: 'line',
@@ -183,7 +200,9 @@ async function updateDashboard(hostname) {
                                 type: 'time',
                                 time: { unit: 'minute' },
                                 title: { display: true, text: 'Time' },
-                                ticks: { autoSkip: true, maxTicksLimit: 20 }
+                                ticks: { autoSkip: true, maxTicksLimit: 20 },
+                                min: startDate,
+                                max: endDate
                             },
                             y: {
                                 beginAtZero: true,
@@ -203,12 +222,17 @@ async function updateDashboard(hostname) {
         } else {
             console.error(`No data found for hostname: ${hostname}`);
             updateHostInfo(hostname, {});
+            document.getElementById('chartContainer').innerHTML = '';
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
         }
     }
 
-    await updateRecentAlerts(hostname);
-    await updateDowntimes(hostname);
-    await updateAlertConfigs(hostname);
+    if (!isRealtimeUpdate) {
+        await updateRecentAlerts(hostname);
+        await updateDowntimes(hostname);
+        await updateAlertConfigs(hostname);
+    }
 }
 
 function checkUrlForHost() {
@@ -241,16 +265,17 @@ function initDashboard() {
 function startDashboardUpdater() {
     setInterval(() => {
         const hostname = document.querySelector('#hostSelector select').value;
-        updateDashboard(hostname);
-    }, 60000);  // Update every minute
+        if (!document.getElementById('lastRealtimeButton').classList.contains('active')) {
+            updateDashboard(hostname);
+        }
+    }, 60000);  // Update every minute for non-realtime views
 }
 
 async function handleUpdate() {
+    console.log('Update button clicked');
     const hostname = document.querySelector('#hostSelector select').value;
     await updateDashboard(hostname);
 }
-
-// Event listeners
 
 document.getElementById('alertForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -266,7 +291,6 @@ document.getElementById('downtimeForm').addEventListener('submit', async (event)
     await updateDowntimes(hostname);
 });
 
-// Initialize the dashboard
 document.addEventListener('DOMContentLoaded', function() {
     initDashboard();
     startDashboardUpdater();

@@ -19,28 +19,44 @@ async function fetchMetricHistory(hostname, metricName, startDate, endDate) {
     return history;
 }
 
+let updateInterval;
 
 function setTimeRange(range) {
+    clearInterval(updateInterval);
+
     const end = new Date();
     let start;
 
     switch (range) {
+        case 'realtime':
+            start = new Date(end.getTime() - 5 * 60 * 1000);  // Last 5 minutes
+            updateInterval = setInterval(() => {
+                const currentEnd = new Date();
+                const currentStart = new Date(currentEnd.getTime() - 5 * 60 * 1000);
+                document.getElementById('endDate').value = currentEnd.toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16);
+                document.getElementById('startDate').value = currentStart.toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16);
+            }, 1000);  // Update every second
+            break;
         case 'hour':
-            start = new Date(end.getTime() - 60 * 60 * 1000);  // 1 hour ago
+            start = new Date(end.getTime() - 60 * 60 * 1000);  // Last hour
             break;
         case 'day':
-            start = new Date(end.getTime() - 24 * 60 * 60 * 1000);  // 1 day ago
+            start = new Date(end.getTime() - 24 * 60 * 60 * 1000);  // Last day
             break;
         case 'week':
-            start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);  // 1 week ago
+            start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);  // Last week
             break;
         case 'month':
-            start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);  // 1 month ago
+            start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);  // Last month
             break;
+        default:
+            start = new Date(end.getTime() - 60 * 60 * 1000);  // Default to last hour
     }
 
     document.getElementById('endDate').value = end.toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16);
     document.getElementById('startDate').value = start.toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16);
+
+    return { start, end };
 }
 
 function updateFormVisibility(selectedHostname) {
