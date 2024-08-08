@@ -10,6 +10,7 @@ This is an advanced, scalable monitoring system built with Python and Tornado. I
 - 100% Python implementation - absolutely no PHP or other legacy languages in sight
 - Modern, from-the-ground-up design - not built on a 20-year-old core
 - Server-client architecture for distributed monitoring
+- Shared-secret signature-based communication between server and client
 - Extensible metric collection through custom Python scripts
 - All metrics are implemented natively in Python, allowing for easy customization and extension
 - PostgreSQL database for robust and scalable storage of metrics
