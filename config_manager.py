@@ -42,7 +42,7 @@ class ConfigManager:
             logger.error(f"Invalid JSON in config file: {self.config_file}. Using default configuration.")
             return self.get_default_config()
 
-    def get_default_config(self):
+    def get_default_config(self): #todo adjust this
         default_config = {
             "server_url": "http://localhost:8888",
             "default_interval": 60,
