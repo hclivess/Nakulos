@@ -1,3 +1,5 @@
+# metric_collector.py
+
 import importlib.util
 import os
 import time
@@ -29,29 +31,38 @@ class MetricCollector:
                 except Exception as e:
                     logger.error(f"Error loading metric module {module_name}: {str(e)}")
 
+    def reload_active_metrics(self):
+        self.config_manager.active_metrics = [
+            metric for metric in self.config_manager.active_metrics
+            if metric in self.metrics_modules
+        ]
+        logger.info(f"Active metrics reloaded: {self.config_manager.active_metrics}")
+
     def get_metric_interval(self, metric_name):
         return self.config_manager.metric_intervals.get(metric_name, self.config_manager.default_interval)
 
     def collect_metrics(self):
         current_time = time.time()
         collected_metrics = {}
-        for name, module in self.metrics_modules.items():
-            interval = self.get_metric_interval(name)
-            last_collection = self.last_collection_times.get(name, 0)
-            if current_time - last_collection >= interval:
-                try:
-                    value = module.collect()
-                    collected_metrics[name] = {'value': value, 'timestamp': current_time}
-                    self.last_collection_times[name] = current_time
-                    logger.info(f"Collected metric {name}: {value}")
-                except Exception as e:
-                    logger.error(f"Error collecting metric {name}: {e}", exc_info=True)
+        for name in self.config_manager.active_metrics:
+            if name in self.metrics_modules:
+                module = self.metrics_modules[name]
+                interval = self.get_metric_interval(name)
+                last_collection = self.last_collection_times.get(name, 0)
+                if current_time - last_collection >= interval:
+                    try:
+                        value = module.collect()
+                        collected_metrics[name] = {'value': value, 'timestamp': current_time}
+                        self.last_collection_times[name] = current_time
+                        logger.info(f"Collected metric {name}: {value}")
+                    except Exception as e:
+                        logger.error(f"Error collecting metric {name}: {e}", exc_info=True)
         return collected_metrics
 
     def get_shortest_interval(self):
-        if not self.metrics_modules:
+        if not self.config_manager.active_metrics:
             return self.config_manager.default_interval
-        return min(self.get_metric_interval(metric) for metric in self.metrics_modules.keys())
+        return min(self.get_metric_interval(metric) for metric in self.config_manager.active_metrics)
 
     def update_metric_script(self, metric_name, metric_code):
         file_path = os.path.join(self.config_manager.metrics_dir, f"{metric_name}.py")

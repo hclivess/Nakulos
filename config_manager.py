@@ -1,3 +1,5 @@
+# config_manager.py
+
 import json
 import logging
 import uuid
@@ -25,6 +27,7 @@ class ConfigManager:
         self.metrics_dir = self.config.get('metrics_dir', os.path.join(os.path.dirname(__file__), 'metrics'))
         self.tags = self.config.get('tags', {})
         self.last_update = self.config.get('last_update', '0')
+        self.active_metrics = self.config.get('active_metrics', [])
 
     def load_config(self):
         try:
@@ -46,7 +49,8 @@ class ConfigManager:
             "metrics_dir": os.path.join(os.path.dirname(__file__), 'metrics'),
             "client_id": str(uuid.uuid4()),
             "secret_key": str(uuid.uuid4()),
-            "last_update": "0"
+            "last_update": "0",
+            "active_metrics": []
         }
         self.save_config(default_config)
         return default_config
@@ -65,8 +69,10 @@ class ConfigManager:
         self.metrics_dir = self.config.get('metrics_dir', './metrics')
         self.tags = self.config.get('tags', {})
         self.last_update = self.config.get('last_update', self.last_update)
+        self.active_metrics = self.config.get('active_metrics', self.active_metrics)
         self.save_config(self.config)
 
     def set_last_update(self, timestamp):
         self.last_update = str(int(timestamp))
+        self.config['last_update'] = self.last_update
         self.save_config(self.config)
