@@ -26,6 +26,8 @@ This is an advanced, scalable monitoring system built with Python and Tornado. I
 - Data simulation tool for testing and development
 - Flexible data management, including the ability to selectively delete metrics when needed
 - Pure Python implementation, making it easy to understand, modify, and extend the entire system
+- Dynamic metric selection with perioid rediscovery and remote or local configuration
+- End-to-end monitoring including Selenium, Autoit, PyAutoGUI supporting elements, positional clicking, bitmap synchronization (OCR)
 
 ## Requirements
 
@@ -39,42 +41,71 @@ This is an advanced, scalable monitoring system built with Python and Tornado. I
 
 1. Clone this repository or download the source files.
 2. Install the required packages:
-pip install tornado psycopg2-binary
+   ```
+   pip install tornado psycopg2-binary
+   ```
 3. Ensure you have PostgreSQL installed and running.
-
-## File Structure
-
-- `server.py`: The main server script
-- `client.py`: The client script for collecting and sending metrics
-- `metrics/`: Directory for custom metric collection scripts
-- `handlers.py`: Contains all the request handlers
-- `database.py`: Database connection and operations
-- `queue_manager.py`: Manages the in-memory queue for metric processing
-- `data_aggregator.py`: Handles data aggregation for efficient storage
-- `server_config.json`: Configuration file for server settings
-- `client_config.json`: Configuration file for client settings
-- `dashboard.html`: HTML template for the dashboard
-- `dashboard.js`: JavaScript for dashboard functionality
-- `chart.js`: Chart configuration for dashboard
-- `alerts.js`: Alert management on the dashboard
-- `downtimes.js`: Downtime management on the dashboard
-- `utils.js`: Utility functions for the dashboard
-- `admin_interface.html`: HTML template for the admin interface
-- `admin.js`: JavaScript for admin interface functionality
-- `simulator.py`: Data simulation tool for testing
-- `wipeout.py`: Script to clear all data (use with caution)
 
 ## Setup
 
 1. Server Setup:
-- Create a `server_config.json` file with your database and server settings.
-- Run the server using: `python server.py`
+   - Create a `server_config.json` file with your database and server settings.
+   - Run the server using: `python server.py`
 
 2. Client Setup:
-- Create a metrics directory in the same location as client.py
-- Add custom Python scripts to the metrics directory for each metric you want to collect
-- Configure `client_config.json` with appropriate settings
-- Run the client using: `python client.py`
+   - Create a metrics directory in the same location as client.py
+   - Add custom Python scripts to the metrics directory for each metric you want to collect
+   - Configure `client_config.json` with appropriate settings (see Configuration section)
+   - Run the client using: `python client.py`
+
+## Configuration
+
+### Client Configuration
+
+Update your `client_config.json` file to include the following new fields:
+
+```json
+{
+    "client_id": "",
+    "server_url": "http://localhost:8888",
+    "default_interval": 60,
+    "metrics_dir": "./metrics",
+    "secret_key": "your_secret_key",
+    "active_metrics": ["cpu_usage", "memory_usage", "disk_usage"],
+    "metric_intervals": {
+        "cpu_usage": 30,
+        "memory_usage": 60,
+        "disk_usage": 300
+    },
+    "tags": {
+        "environment": "production",
+        "role": "webserver"
+    }
+}
+```
+
+- `active_metrics`: List of metrics that should be collected. Only metrics in this list will be gathered and sent to the server.
+- `metric_intervals`: Custom collection intervals for specific metrics (in seconds). If not specified, the `default_interval` will be used.
+
+### Adding Custom Metrics
+
+1. Create a new Python file in the `metrics` directory (e.g., `custom_metric.py`).
+2. Implement a `collect()` function that returns the metric value:
+
+   ```python
+   def collect():
+       # Your metric collection logic here
+       return value
+   ```
+
+3. Add the metric name to the `active_metrics` list in `client_config.json`.
+
+### Enabling/Disabling Metrics
+
+To enable or disable metrics without restarting the client:
+
+1. Update the `active_metrics` list in `client_config.json`.
+2. The client will automatically detect the change and adjust its metric collection accordingly on the next update cycle.
 
 ## Usage
 
@@ -92,22 +123,9 @@ Access the admin interface at `http://localhost:8888/admin`. Features include:
 - Client configuration management
 - Metric script uploading
 - Host tag management
+- Active metric configuration
 
-### Adding Custom Metrics
-
-To add a new metric:
-1. Create a new Python file in the metrics directory
-2. Implement a `collect()` function that returns the metric value
-
-### Client Buffering
-
-The client implements a local buffer to store metrics when the server is unreachable. Features include:
-- Automatic buffering of metrics during network issues
-- Configurable buffer size
-- Automatic retry and buffer flush when connection is restored
-- Persistent storage using SQLite for resilience against client restarts
-
-### API Endpoints
+## API Endpoints
 
 - `GET /`: Check if the server is running
 - `POST /metrics`: Submit metrics (used by the client)
@@ -125,15 +143,11 @@ The client implements a local buffer to store metrics when the server is unreach
 - `GET /client_config`: Fetch client configuration
 - `POST /client_config`: Register or update client configuration
 
-## Data Simulation
+## Troubleshooting
 
-Use `simulator.py` to generate test data:
-python simulator.py
-Follow the prompts to specify the number of hosts, days of data, and metrics per hour.
-
-## Data Retention and Aggregation
-
-The system uses advanced data aggregation techniques to efficiently store historical data. Aggregation is performed automatically on a schedule, and can also be triggered manually via the API.
+- If metrics are not being collected, check the `active_metrics` list in your client configuration.
+- Ensure that all custom metric scripts have a `collect()` function.
+- Check the client logs for any errors related to metric collection or script loading.
 
 ## Contributing
 
