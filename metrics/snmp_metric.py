@@ -1,41 +1,52 @@
-from pysnmp.hlapi import *
-import json
+import socket
+import struct
+import time
+
+
+def simple_snmp_get(host='localhost', port=161, oid=0):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(2)
+
+    try:
+        # Send a request (just send the OID as a single byte)
+        sock.sendto(bytes([oid]), (host, port))
+
+        data, _ = sock.recvfrom(1024)
+        if len(data) != 4:
+            print(f"Received unexpected data length: {len(data)} bytes")
+            return None
+        value = struct.unpack('!I', data)[0]
+        return value
+    except socket.timeout:
+        print(f"Timeout while querying {host} for OID {oid}")
+        return None
+    except Exception as e:
+        print(f"Error querying {host} for OID {oid}: {e}")
+        return None
+    finally:
+        sock.close()
 
 
 def collect():
-    with open('client_config.json', 'r') as config_file:
-        config = json.load(config_file)
+    oids = {
+        'sysUpTime': 0,
+        'ifInOctets': 1,
+        'ifOutOctets': 2,
+        'cpuUsage': 3
+    }
 
-    snmp_targets = config.get('snmp_targets', [])
     results = {}
-
-    for target in snmp_targets:
-        hostname = target['hostname']
-        community = target['community']
-        oids = target['oids']
-
-        target_results = {}
-        for oid_name, oid in oids.items():
-            errorIndication, errorStatus, errorIndex, varBinds = next(
-                getCmd(SnmpEngine(),
-                       CommunityData(community),
-                       UdpTransportTarget((hostname, 161)),
-                       ContextData(),
-                       ObjectType(ObjectIdentity(oid)))
-            )
-
-            if errorIndication:
-                print(f"Error: {errorIndication}")
-            elif errorStatus:
-                print(f"Error: {errorStatus}")
-            else:
-                for varBind in varBinds:
-                    target_results[oid_name] = str(varBind[1])
-
-        results[hostname] = target_results
+    for oid_name, oid in oids.items():
+        value = simple_snmp_get(oid=oid)
+        if value is not None:
+            results[oid_name] = value
 
     return results
 
 
 if __name__ == "__main__":
-    print(collect())
+    start_time = time.time()
+    result = collect()
+    end_time = time.time()
+    print(f"Simple SNMP-like Collection Results: {result}")
+    print(f"Collection took {end_time - start_time:.2f} seconds")

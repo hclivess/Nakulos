@@ -1,37 +1,12 @@
 {
-    "client_id": "d0e5b4f-628a-4739-9889-9c6a55a43225",
     "server_url": "http://localhost:8888",
     "default_interval": 60,
-    "metrics_dir": "./metrics",
-    "secret_key": "your_secret_key",
-    "active_metrics": ["cpu_usage", "memory_usage", "disk_usage", "snmp_metric"],
-    "metric_intervals": {
-        "cpu_usage": 30,
-        "memory_usage": 60,
-        "disk_usage": 300,
-        "snmp_metric": 300
-    },
-    "tags": {
-        "environment": "production",
-        "role": "webserver"
-    },
-    "snmp_targets": [
-        {
-            "hostname": "192.168.1.1",
-            "community": "public",
-            "oids": {
-                "sysUpTime": "1.3.6.1.2.1.1.3.0",
-                "ifInOctets": "1.3.6.1.2.1.2.2.1.10.1",
-                "ifOutOctets": "1.3.6.1.2.1.2.2.1.16.1"
-            }
-        },
-        {
-            "hostname": "192.168.1.2",
-            "community": "public",
-            "oids": {
-                "sysUpTime": "1.3.6.1.2.1.1.3.0",
-                "cpuUsage": "1.3.6.1.4.1.9.9.109.1.1.1.1.5.1"
-            }
-        }
-    ]
+    "metrics_dir": "C:\\Users\\1kuceraj\\PycharmProjects\\Scanopse\\metrics",
+    "client_id": "bcff1bc5-251b-42b7-9acc-50d5b221d70a",
+    "secret_key": "your_very_secret_key_here",
+    "last_update": "1723151354",
+    "active_metrics": [
+        "cpu_usage"
+    ],
+    "tags": {}
 }
