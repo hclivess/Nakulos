@@ -1,6 +1,7 @@
 {
     "tags": {
-        "foo": "barbara"
+        "foo": "barbara",
+        "froo": "whatever"
     },
     "interval": 60,
     "metrics_dir": "./metrics",

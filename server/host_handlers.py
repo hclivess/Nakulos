@@ -106,22 +106,26 @@ class UpdateTagsHandler(BaseHandler):
 
                 logger.info(f"Current config for {hostname}: {current_config}")
 
-                # Update the tags in the configuration
-                current_config['tags'] = new_tags
+                # Merge new tags with existing tags
+                current_tags = current_config.get('tags', {})
+                current_tags.update(new_tags)
+                current_config['tags'] = current_tags
+
+                logger.info(f"Updated config for {hostname}: {current_config}")
 
                 # Convert the updated config back to a JSON string
                 updated_config_json = json.dumps(current_config)
 
-                # Update the client configuration with the new tags
+                # Update the client configuration with the merged tags
                 cursor.execute("""
                     UPDATE client_configs
                     SET config = %s, last_updated = NOW()
                     WHERE client_id = %s
                 """, (updated_config_json, client_id))
 
-            self.write({"message": f"Client configuration updated with new tags for {hostname}. Client will fetch on next check."})
+            self.write({"message": f"Client configuration updated with merged tags for {hostname}. Client will fetch on next check."})
         except Exception as e:
-            logger.error(f"Error updating client configuration with new tags: {str(e)}")
+            logger.error(f"Error updating client configuration with merged tags: {str(e)}")
             logger.error(traceback.format_exc())
             self.set_status(500)
             self.write({"error": f"Internal server error: {str(e)}"})

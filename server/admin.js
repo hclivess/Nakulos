@@ -249,6 +249,16 @@ document.getElementById('updateTagsForm').addEventListener('submit', async (even
     }
 });
 
+// Add explanation about tag merging behavior
+const tagExplanation = document.createElement('p');
+tagExplanation.innerHTML = `
+    <strong>Note:</strong> New tags will be merged with existing tags.
+    Existing tags will be updated if their keys match, and new tags will be added.
+    Example: {"environment": "production", "new_tag": "value"}
+`;
+document.getElementById('updateTagsForm').insertBefore(tagExplanation, document.getElementById('updateTagsForm').firstChild);
+
+
 // Initialize the page
 document.addEventListener('DOMContentLoaded', () => {
     // Fetch metrics for the initially selected host
