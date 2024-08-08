@@ -4,6 +4,12 @@ from auth_handlers import BaseHandler
 
 logger = logging.getLogger(__name__)
 
+import json
+import logging
+from auth_handlers import BaseHandler
+
+logger = logging.getLogger(__name__)
+
 
 class ClientConfigHandler(BaseHandler):
     async def get(self):
@@ -42,7 +48,7 @@ class ClientConfigHandler(BaseHandler):
         client_id = data.get('client_id')
         hostname = data.get('hostname')
         new_config = data.get('config')
-        tags = data.get('tags', {})
+        new_tags = data.get('tags', {})
 
         if not client_id or not hostname or not new_config:
             self.set_status(400)
@@ -55,22 +61,46 @@ class ClientConfigHandler(BaseHandler):
                 cursor.execute("SELECT config FROM client_configs WHERE client_id = %s", (client_id,))
                 result = cursor.fetchone()
 
-                if result and result['config'] == json.dumps(new_config):
-                    # Config hasn't changed, don't update last_updated
-                    self.write({"status": "success", "message": "No changes to config"})
+                if result:
+                    current_config = json.loads(result['config'])
+
+                    # Merge new config with current config
+                    self.merge_configs(current_config, new_config)
+
+                    # Merge new tags with current tags
+                    current_tags = current_config.get('tags', {})
+                    current_tags.update(new_tags)
+                    current_config['tags'] = current_tags
+
+                    updated_config_json = json.dumps(current_config)
+
+                    if updated_config_json == result['config']:
+                        self.write({"status": "success", "message": "No changes to config"})
+                    else:
+                        cursor.execute("""
+                            UPDATE client_configs
+                            SET hostname = %s, config = %s, last_updated = NOW()
+                            WHERE client_id = %s
+                        """, (hostname, updated_config_json, client_id))
+                        self.write({"status": "success", "message": "Client config updated successfully"})
                 else:
-                    # Config has changed or is new, update everything including last_updated
+                    # New client, insert the config as is
                     cursor.execute("""
-                        INSERT INTO client_configs (client_id, hostname, config, tags, last_updated)
-                        VALUES (%s, %s, %s, %s, NOW())
-                        ON CONFLICT (client_id) DO UPDATE
-                        SET hostname = EXCLUDED.hostname, config = EXCLUDED.config, tags = EXCLUDED.tags, last_updated = NOW()
-                    """, (client_id, hostname, json.dumps(new_config), json.dumps(tags)))
-                    self.write({"status": "success", "message": "Client config updated successfully"})
+                        INSERT INTO client_configs (client_id, hostname, config, last_updated)
+                        VALUES (%s, %s, %s, NOW())
+                    """, (client_id, hostname, json.dumps(new_config)))
+                    self.write({"status": "success", "message": "New client config created successfully"})
         except Exception as e:
             logger.error(f"Error in ClientConfigHandler POST: {str(e)}")
             self.set_status(500)
             self.write({"error": "Internal server error"})
+
+    def merge_configs(self, current_config, new_config):
+        for key, value in new_config.items():
+            if isinstance(value, dict) and key in current_config and isinstance(current_config[key], dict):
+                self.merge_configs(current_config[key], value)
+            else:
+                current_config[key] = value
 
 class FetchMetricsHandler(BaseHandler):
     async def get(self):
