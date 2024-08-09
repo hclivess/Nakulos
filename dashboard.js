@@ -144,6 +144,25 @@ async function updateDashboard(hostname, isRealtimeUpdate = false) {
     console.log('Updating dashboard...');
     console.log('Selected hostname:', hostname);
 
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    let startDate = new Date(startDateInput.value);
+    let endDate = new Date(endDateInput.value);
+
+    // Check if we're using a preset time range
+    const activeTimeRangeButton = document.querySelector('.dropdown-item.active');
+    const isCustomRange = !activeTimeRangeButton;
+
+    // If it's a real-time update and not a custom range, move the end date to now
+    if (isRealtimeUpdate && !isCustomRange) {
+        endDate = new Date();
+        const timeDiff = endDate - startDate;
+        startDate = new Date(endDate - timeDiff);
+
+        startDateInput.value = startDate.toISOString().slice(0, 16);
+        endDateInput.value = endDate.toISOString().slice(0, 16);
+    }
+
     if (hostname === 'all') {
         document.getElementById('hostInfo').style.display = 'none';
         document.getElementById('chartContainer').innerHTML = '';
@@ -159,9 +178,6 @@ async function updateDashboard(hostname, isRealtimeUpdate = false) {
             console.log('Metric names:', metricNames);
 
             updateHostInfo(hostname, hostData.tags || {});
-
-            const startDate = new Date(document.getElementById('startDate').value);
-            const endDate = new Date(document.getElementById('endDate').value);
 
             const datasets = {};
             const fetchPromises = metricNames.map(async (metricName) => {

@@ -22,6 +22,9 @@ async function fetchLatestMetrics() {
 
 async function fetchMetricHistory(hostname, metricName, startDate, endDate) {
     const response = await fetch(`/fetch/history/${hostname}/${metricName}?start=${startDate}&end=${endDate}`);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
     const history = await response.json();
     console.log(`Fetched history for ${hostname} - ${metricName}:`, history);
     return history;
@@ -35,9 +38,13 @@ function setTimeRange(range) {
     const end = new Date();
     let start;
 
+    // Remove active class from all buttons
+    document.querySelectorAll('.dropdown-item').forEach(btn => btn.classList.remove('active'));
+
     switch (range) {
         case 'realtime':
             start = new Date(end.getTime() - 5 * 60 * 1000);  // Last 5 minutes
+            document.getElementById('lastRealtimeButton').classList.add('active');
             updateInterval = setInterval(() => {
                 const currentEnd = new Date();
                 const currentStart = new Date(currentEnd.getTime() - 5 * 60 * 1000);
@@ -47,15 +54,19 @@ function setTimeRange(range) {
             break;
         case 'hour':
             start = new Date(end.getTime() - 60 * 60 * 1000);  // Last hour
+            document.getElementById('lastHourButton').classList.add('active');
             break;
         case 'day':
             start = new Date(end.getTime() - 24 * 60 * 60 * 1000);  // Last day
+            document.getElementById('lastDayButton').classList.add('active');
             break;
         case 'week':
             start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);  // Last week
+            document.getElementById('lastWeekButton').classList.add('active');
             break;
         case 'month':
             start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);  // Last month
+            document.getElementById('lastMonthButton').classList.add('active');
             break;
         default:
             start = new Date(end.getTime() - 60 * 60 * 1000);  // Default to last hour
