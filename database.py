@@ -103,7 +103,7 @@ def init_db(config):
                     host_id INTEGER REFERENCES hosts(id) ON DELETE CASCADE,
                     metric_name VARCHAR(255) NOT NULL,
                     timestamp FLOAT NOT NULL,
-                    value FLOAT NOT NULL
+                    value JSONB NOT NULL
                 )
             '''),
             ("alerts", '''
@@ -131,7 +131,7 @@ def init_db(config):
                     host_id INTEGER REFERENCES hosts(id) ON DELETE CASCADE,
                     alert_id INTEGER REFERENCES alerts(id) ON DELETE CASCADE,
                     timestamp FLOAT NOT NULL,
-                    value FLOAT NOT NULL
+                    value JSONB NOT NULL
                 )
             '''),
             ("client_configs", '''

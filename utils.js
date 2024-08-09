@@ -6,10 +6,18 @@ async function fetchHosts() {
 }
 
 async function fetchLatestMetrics() {
-    const response = await fetch('/fetch/latest');
-    const metrics = await response.json();
-    console.log('Fetched latest metrics:', metrics);
-    return metrics;
+    try {
+        const response = await fetch('/fetch/latest');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const metrics = await response.json();
+        console.log('Fetched latest metrics:', metrics);
+        return metrics;
+    } catch (error) {
+        console.error('Error fetching latest metrics:', error);
+        return { error: 'Failed to fetch latest metrics' };
+    }
 }
 
 async function fetchMetricHistory(hostname, metricName, startDate, endDate) {

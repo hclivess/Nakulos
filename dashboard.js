@@ -1,4 +1,4 @@
-import { initChart, updateChart } from './chart.js';
+import { initChart, updateChart, addDataToChart, updateChartTimeRange } from './chart.js';
 import { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates } from './alerts.js';
 import { updateDowntimes, addDowntime, deleteDowntime } from './downtimes.js';
 import { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility } from './utils.js';
@@ -164,60 +164,29 @@ async function updateDashboard(hostname, isRealtimeUpdate = false) {
             const endDate = new Date(document.getElementById('endDate').value);
 
             const datasets = {};
-            const fetchPromises = metricNames.map(async (metric, index) => {
-                const metricData = await fetchMetricHistory(hostname, metric, startDate.getTime() / 1000, endDate.getTime() / 1000);
-                const data = metricData.map(point => ({ x: new Date(point[0] * 1000), y: point[1] }));
-                datasets[metric] = {
-                    label: metric,
-                    data: data,
-                    borderColor: getVibrantColor(index),
-                    fill: false
-                };
+            const fetchPromises = metricNames.map(async (metricName) => {
+                const metricData = await fetchMetricHistory(hostname, metricName, startDate.getTime() / 1000, endDate.getTime() / 1000);
+                console.log(`Fetched data for ${metricName}:`, metricData);
+                datasets[metricName] = processMetricData(metricData, metricName);
+                console.log(`Processed datasets for ${metricName}:`, datasets[metricName]);
             });
 
             await Promise.all(fetchPromises);
 
             document.getElementById('chartContainer').innerHTML = '';
-            for (const metric of metricNames) {
+            for (const metricName of metricNames) {
                 const chartDiv = document.createElement('div');
                 chartDiv.className = 'col-12';
                 chartDiv.style.height = '400px';
-                chartDiv.innerHTML = `<canvas id="${metric}Chart"></canvas>`;
+                chartDiv.innerHTML = `<canvas id="${metricName}Chart"></canvas>`;
                 document.getElementById('chartContainer').appendChild(chartDiv);
             }
 
-            for (const metric of metricNames) {
-                if (charts[metric]) {
-                    charts[metric].destroy();
+            for (const metricName of metricNames) {
+                if (charts[metricName]) {
+                    charts[metricName].destroy();
                 }
-                const ctx = document.getElementById(`${metric}Chart`).getContext('2d');
-                charts[metric] = new Chart(ctx, {
-                    type: 'line',
-                    data: { datasets: [datasets[metric]] },
-                    options: {
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: { unit: 'minute' },
-                                title: { display: true, text: 'Time' },
-                                ticks: { autoSkip: true, maxTicksLimit: 20 },
-                                min: startDate,
-                                max: endDate
-                            },
-                            y: {
-                                beginAtZero: true,
-                                title: { display: true, text: 'Value' },
-                                ticks: { autoSkip: true, maxTicksLimit: 10 }
-                            }
-                        },
-                        plugins: {
-                            title: { display: true, text: `${metric} Over Time` },
-                            legend: { position: 'top' }
-                        },
-                        responsive: true,
-                        maintainAspectRatio: false
-                    }
-                });
+                charts[metricName] = updateChart(null, metricName, datasets[metricName], startDate, endDate);
             }
         } else {
             console.error(`No data found for hostname: ${hostname}`);
@@ -233,6 +202,27 @@ async function updateDashboard(hostname, isRealtimeUpdate = false) {
         await updateDowntimes(hostname);
         await updateAlertConfigs(hostname);
     }
+}
+
+function processMetricData(metricData, metricName) {
+    const datasets = [];
+    if (metricData.length > 0) {
+        const firstPoint = metricData[0].value;
+        const keys = Object.keys(firstPoint);
+        keys.forEach((key, index) => {
+            datasets.push({
+                label: key,
+                data: metricData.map(point => ({
+                    x: new Date(point.timestamp * 1000),
+                    y: point.value[key]
+                })).filter(dataPoint => dataPoint.y !== null),
+                borderColor: getVibrantColor(index),
+                backgroundColor: getVibrantColor(index),
+                fill: false
+            });
+        });
+    }
+    return datasets;
 }
 
 function checkUrlForHost() {

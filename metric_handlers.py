@@ -8,7 +8,6 @@ import hashlib
 
 logger = logging.getLogger(__name__)
 
-
 class MetricsHandler(BaseHandler):
     def initialize(self, metric_processor, secret_key):
         super().initialize()
@@ -37,12 +36,12 @@ class MetricsHandler(BaseHandler):
             tags = data.get('tags', {})
 
             for metric_name, metric_data in metrics.items():
-                if isinstance(metric_data, dict) and 'value' in metric_data and 'timestamp' in metric_data:
-                    value = metric_data['value']
-                    timestamp = metric_data['timestamp']
+                if isinstance(metric_data, dict):
+                    timestamp = metric_data.get('timestamp', time.time())
+                    value = json.dumps(metric_data)  # Store the entire metric data as JSON
                 else:
-                    value = metric_data
                     timestamp = time.time()
+                    value = json.dumps({'value': metric_data})  # Wrap single values in a dict
 
                 metric_data = {
                     'hostname': hostname,
@@ -63,6 +62,7 @@ class MetricsHandler(BaseHandler):
         message = json.dumps(data, sort_keys=True, separators=(',', ':'))
         expected_signature = hmac.new(self.secret_key.encode(), message.encode(), hashlib.sha256).hexdigest()
         return hmac.compare_digest(signature, expected_signature)
+
 
 class FetchLatestHandler(BaseHandler):
     async def get(self):
@@ -89,14 +89,26 @@ class FetchLatestHandler(BaseHandler):
                         'metrics': {},
                         'tags': row['tags'] if isinstance(row['tags'], dict) else {}
                     }
-                latest_metrics[hostname]['metrics'][row['metric_name']] = float(row['value'])
+
+                metric_value = row['value']
+                if isinstance(metric_value, str):
+                    try:
+                        metric_value = json.loads(metric_value)
+                    except json.JSONDecodeError:
+                        logger.error(f"Invalid JSON in metric value for {hostname} - {row['metric_name']}")
+                        metric_value = {'value': metric_value}  # Fallback to treating it as a single value
+                elif not isinstance(metric_value, dict):
+                    metric_value = {'value': metric_value}  # Wrap non-dict values
+
+                latest_metrics[hostname]['metrics'][row['metric_name']] = metric_value
 
             self.set_header("Content-Type", "application/json")
             self.write(json.dumps(latest_metrics))
         except Exception as e:
-            logger.error(f"Error in FetchLatestHandler: {str(e)}")
+            logger.error(f"Error in FetchLatestHandler: {str(e)}", exc_info=True)
             self.set_status(500)
-            self.write(json.dumps({"error": "Internal server error"}))
+            self.write(json.dumps({"error": "Internal server error", "details": str(e)}))
+
 
 class FetchHistoryHandler(BaseHandler):
     async def get(self, hostname, metric_name):
@@ -117,30 +129,31 @@ class FetchHistoryHandler(BaseHandler):
                 history = cursor.fetchall()
 
             result = []
-            current_time = start
             for point in history:
-                while current_time < point['timestamp']:
-                    result.append([current_time, None])
-                    current_time += 60
-                result.append([point['timestamp'], point['value']])
-                current_time = point['timestamp'] + 60
+                data_point = {'timestamp': point['timestamp']}
+                value = point['value']
 
-            while current_time <= end:
-                result.append([current_time, None])
-                current_time += 60
+                if isinstance(value, str):
+                    try:
+                        value = json.loads(value)
+                    except json.JSONDecodeError:
+                        logger.error(f"Invalid JSON in metric value for {hostname} - {metric_name}")
+                        value = {'value': value}  # Fallback to treating it as a single value
+                elif not isinstance(value, dict):
+                    value = {'value': value}  # Wrap non-dict values
 
-            total_points = len(result)
+                data_point.update(value)
+                result.append(data_point)
 
-            if total_points > limit:
-                step = max(1, total_points // limit)
-                result = [result[i] for i in range(0, total_points, step)]
-                result = result[:limit]
+            if len(result) > limit:
+                step = len(result) // limit
+                result = result[::step][:limit]
 
             self.write(json.dumps(result))
         except Exception as e:
-            logger.error(f"Error in FetchHistoryHandler: {str(e)}")
+            logger.error(f"Error in FetchHistoryHandler: {str(e)}", exc_info=True)
             self.set_status(500)
-            self.write({"error": "Internal server error"})
+            self.write({"error": "Internal server error", "details": str(e)})
 
 class FetchMetricsForHostHandler(BaseHandler):
     async def get(self):
