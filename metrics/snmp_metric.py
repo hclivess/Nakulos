@@ -2,32 +2,29 @@ import socket
 import struct
 import time
 
-
-def simple_snmp_get(host='localhost', port=161, oid=0):
+def simple_snmp_get(host='localhost', port=161, oid=0, timeout=2):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(2)
+    sock.settimeout(timeout)
 
     try:
-        # Send a request (just send the OID as a single byte)
+        start_time = time.time()
         sock.sendto(bytes([oid]), (host, port))
-
         data, _ = sock.recvfrom(1024)
+        end_time = time.time()
+
         if len(data) != 4:
-            print(f"Received unexpected data length: {len(data)} bytes")
-            return None
+            return None, f"Received unexpected data length: {len(data)} bytes", end_time - start_time
+
         value = struct.unpack('!I', data)[0]
-        return value
+        return value, None, end_time - start_time
     except socket.timeout:
-        print(f"Timeout while querying {host} for OID {oid}")
-        return None
+        return None, f"Timeout while querying {host} for OID {oid}", timeout
     except Exception as e:
-        print(f"Error querying {host} for OID {oid}: {e}")
-        return None
+        return None, f"Error querying {host} for OID {oid}: {str(e)}", 0
     finally:
         sock.close()
 
-
-def collect():
+def collect(host='localhost', port=161):
     oids = {
         'sysUpTime': 0,
         'ifInOctets': 1,
@@ -36,17 +33,29 @@ def collect():
     }
 
     results = {}
+    errors = []
+    total_time = 0
+
     for oid_name, oid in oids.items():
-        value = simple_snmp_get(oid=oid)
+        value, error, query_time = simple_snmp_get(host=host, port=port, oid=oid)
+        total_time += query_time
+
         if value is not None:
             results[oid_name] = value
+        if error:
+            errors.append(f"{oid_name}: {error}")
 
-    return results
-
+    return results, errors, total_time
 
 if __name__ == "__main__":
     start_time = time.time()
-    result = collect()
+    result, errors, query_time = collect()
     end_time = time.time()
+
     print(f"Simple SNMP-like Collection Results: {result}")
-    print(f"Collection took {end_time - start_time:.2f} seconds")
+    if errors:
+        print("Errors encountered:")
+        for error in errors:
+            print(f"- {error}")
+    print(f"Total query time: {query_time:.2f} seconds")
+    print(f"Total collection time: {end_time - start_time:.2f} seconds")
