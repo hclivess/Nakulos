@@ -149,7 +149,7 @@ Access the admin interface at `http://localhost:8888/admin`. Features include:
 
 ## Commercial Use 
 
-Nakulos is available for commercial use under a separate commercial license. Companies interested in using Nakulos for their monitoring needs can contact us at sales@nakulos.com to discuss pricing and support options. We offer flexible plans tailored to the specific requirements of businesses of all sizes.
+Nakulos is available for commercial use under a separate commercial license. Companies interested in using Nakulos for their monitoring needs can contact us at cyphernormie@gmail.com to discuss pricing and support options. We offer flexible plans tailored to the specific requirements of businesses of all sizes.
 
 Benefits of the commercial plan include:
 - Priority support and dedicated account management 
