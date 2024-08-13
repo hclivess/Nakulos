@@ -96,7 +96,10 @@ Update your `client_config.json` file to include the following new fields:
    ```python
    def collect():
        # Your metric collection logic here
-       return value
+       metrics = {"system_1": numeric_value_1,
+                  "system_2": numeric_value_2
+                 }
+       return metrics            
    ```
 
 3. Add the metric name to the `active_metrics` list in `client_config.json`.
@@ -144,6 +147,19 @@ Access the admin interface at `http://localhost:8888/admin`. Features include:
 - `GET /client_config`: Fetch client configuration
 - `POST /client_config`: Register or update client configuration
 
+## Commercial Use 
+
+Nakulos is available for commercial use under a separate commercial license. Companies interested in using Nakulos for their monitoring needs can contact us at sales@nakulos.com to discuss pricing and support options. We offer flexible plans tailored to the specific requirements of businesses of all sizes.
+
+Benefits of the commercial plan include:
+- Priority support and dedicated account management 
+- Access to additional enterprise features and integrations
+- SLA guarantees for uptime and performance
+- Assistance with setup, migration, and customization
+- Option for on-premises or private cloud deployment
+
+Please note that commercial use of Nakulos without a valid commercial license is not permitted under the open-source license detailed below.
+
 ## Troubleshooting
 
 - If metrics are not being collected, check the `active_metrics` list in your client configuration.
@@ -154,7 +170,7 @@ Access the admin interface at `http://localhost:8888/admin`. Features include:
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
+## License 
 
 This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0).
 
