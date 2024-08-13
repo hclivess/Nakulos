@@ -1,144 +1,10 @@
 import { initChart, updateChart, addDataToChart, updateChartTimeRange } from './chart.js';
 import { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates } from './alerts.js';
 import { updateDowntimes, addDowntime, deleteDowntime } from './downtimes.js';
-import { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility } from './utils.js';
+import { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility, createHostSelector, updateHostInfo, getVibrantColor, processMetricData } from './utils.js';
 
 let charts = {};
 let realtimeUpdateInterval;
-
-const vibrantColors = [
-    '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
-    '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
-    '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
-    '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080'
-];
-
-function getVibrantColor(index) {
-    return vibrantColors[index % vibrantColors.length];
-}
-
-function updateUrlWithHost(hostname) {
-    const url = new URL(window.location);
-    url.searchParams.set('host', hostname);
-    window.history.pushState({}, '', url);
-}
-
-function createHostSelector(hosts) {
-    console.log('Hosts data received:', hosts);
-
-    const selector = document.getElementById('hostSelector');
-    selector.innerHTML = '<label for="hostSelect" class="form-label">Select Host:</label>';
-    const select = document.createElement('select');
-    select.id = 'hostSelect';
-    select.className = 'form-select';
-
-    const allOption = document.createElement('option');
-    allOption.value = 'all';
-    allOption.textContent = 'All Hosts';
-    select.appendChild(allOption);
-
-    if (typeof hosts === 'object' && hosts !== null) {
-        Object.entries(hosts).forEach(([hostname, hostData]) => {
-            const option = document.createElement('option');
-            option.value = hostname;
-            option.textContent = hostData.tags && hostData.tags.alias ? hostData.tags.alias : hostname;
-            select.appendChild(option);
-        });
-    } else {
-        console.error('Unexpected hosts data format:', hosts);
-    }
-
-    select.addEventListener('change', async () => {
-        const selectedHostname = select.value;
-        updateUrlWithHost(selectedHostname);
-        await updateDashboard(selectedHostname);
-        updateFormVisibility(selectedHostname);
-    });
-    selector.appendChild(select);
-}
-
-function updateHostInfo(hostname, tags) {
-    const hostInfoDiv = document.getElementById('hostInfo');
-    if (hostInfoDiv) {
-        let content = `<p><strong>Hostname: </strong>${hostname}</p>
-                       <div class="d-flex flex-wrap gap-2">`;
-
-        if (tags && typeof tags === 'object' && Object.keys(tags).length > 0) {
-            for (const [key, value] of Object.entries(tags)) {
-                content += `<span class="badge bg-secondary">${key}: ${value}</span>`;
-            }
-        } else {
-            content += '<span class="badge bg-secondary">No tags</span>';
-        }
-
-        content += '</div>';
-        hostInfoDiv.innerHTML = content;
-    } else {
-        console.warn("Element with id 'hostInfo' not found");
-    }
-}
-
-function setupTimeRangeButtons() {
-    const timeRanges = ['realtime', 'hour', 'day', 'week', 'month'];
-    timeRanges.forEach(range => {
-        const button = document.getElementById(`last${range.charAt(0).toUpperCase() + range.slice(1)}Button`);
-        if (button) {
-            button.addEventListener('click', () => {
-                setTimeRange(range);
-                const selectedHostname = document.querySelector('#hostSelector select').value;
-                updateDashboard(selectedHostname);
-                if (range === 'realtime') {
-                    setupRealtimeUpdate();
-                } else {
-                    clearInterval(realtimeUpdateInterval);
-                }
-            });
-        } else {
-            console.warn(`Button for ${range} not found`);
-        }
-    });
-}
-
-function setupRealtimeUpdate() {
-    clearInterval(realtimeUpdateInterval);
-    realtimeUpdateInterval = setInterval(() => {
-        const hostname = document.querySelector('#hostSelector select').value;
-        updateDashboard(hostname, true);
-    }, 5000);  // Update every 5 seconds
-}
-
-async function removeSelectedHost() {
-    const selectedHostname = document.querySelector('#hostSelector select').value;
-    if (selectedHostname === 'all') {
-        alert('Please select a specific host to remove.');
-        return;
-    }
-
-    if (confirm(`Are you sure you want to remove the host "${selectedHostname}"? This action cannot be undone.`)) {
-        try {
-            const response = await fetch('/remove_host', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ hostname: selectedHostname }),
-            });
-
-            if (response.ok) {
-                alert(`Host "${selectedHostname}" has been removed successfully.`);
-                const hosts = await fetchHosts();
-                createHostSelector(hosts);
-                await updateDashboard('all');
-            } else {
-                const errorData = await response.json();
-                alert(`Failed to remove host: ${errorData.error}`);
-            }
-        } catch (error) {
-            console.error('Error removing host:', error);
-            alert('An error occurred while trying to remove the host. Please try again.');
-        }
-    }
-}
 
 async function updateDashboard(hostname, isRealtimeUpdate = false) {
     console.log('Updating dashboard...');
@@ -149,11 +15,9 @@ async function updateDashboard(hostname, isRealtimeUpdate = false) {
     let startDate = new Date(startDateInput.value);
     let endDate = new Date(endDateInput.value);
 
-    // Check if we're using a preset time range
     const activeTimeRangeButton = document.querySelector('.dropdown-item.active');
     const isCustomRange = !activeTimeRangeButton;
 
-    // If it's a real-time update and not a custom range, move the end date to now
     if (isRealtimeUpdate && !isCustomRange) {
         endDate = new Date();
         const timeDiff = endDate - startDate;
@@ -220,39 +84,72 @@ async function updateDashboard(hostname, isRealtimeUpdate = false) {
     }
 }
 
-function processMetricData(metricData, metricName) {
-    const datasets = [];
-    if (metricData.length > 0) {
-        const firstPoint = metricData[0].value;
-        const keys = Object.keys(firstPoint);
-        keys.forEach((key, index) => {
-            datasets.push({
-                label: key,
-                data: metricData.map(point => ({
-                    x: new Date(point.timestamp * 1000),
-                    y: point.value[key]
-                })).filter(dataPoint => dataPoint.y !== null),
-                borderColor: getVibrantColor(index),
-                backgroundColor: getVibrantColor(index),
-                fill: false
+function setupTimeRangeButtons() {
+    const timeRanges = ['realtime', 'hour', 'day', 'week', 'month'];
+    timeRanges.forEach(range => {
+        const button = document.getElementById(`last${range.charAt(0).toUpperCase() + range.slice(1)}Button`);
+        if (button) {
+            button.addEventListener('click', () => {
+                setTimeRange(range);
+                const selectedHostname = document.querySelector('#hostSelector select').value;
+                updateDashboard(selectedHostname);
+                if (range === 'realtime') {
+                    setupRealtimeUpdate();
+                } else {
+                    clearInterval(realtimeUpdateInterval);
+                }
             });
-        });
-    }
-    return datasets;
+        } else {
+            console.warn(`Button for ${range} not found`);
+        }
+    });
 }
 
-function checkUrlForHost() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const hostParam = urlParams.get('host');
-    if (hostParam) {
-        const hostSelect = document.getElementById('hostSelect');
-        if (hostSelect) {
-            hostSelect.value = hostParam;
-            updateDashboard(hostParam).then(() => {
-                updateFormVisibility(hostParam);
+function setupRealtimeUpdate() {
+    clearInterval(realtimeUpdateInterval);
+    realtimeUpdateInterval = setInterval(() => {
+        const hostname = document.querySelector('#hostSelector select').value;
+        updateDashboard(hostname, true);
+    }, 5000);  // Update every 5 seconds
+}
+
+async function removeSelectedHost() {
+    const selectedHostname = document.querySelector('#hostSelector select').value;
+    if (selectedHostname === 'all') {
+        alert('Please select a specific host to remove.');
+        return;
+    }
+
+    if (confirm(`Are you sure you want to remove the host "${selectedHostname}"? This action cannot be undone.`)) {
+        try {
+            const response = await fetch('/remove_host', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ hostname: selectedHostname }),
             });
+
+            if (response.ok) {
+                alert(`Host "${selectedHostname}" has been removed successfully.`);
+                const hosts = await fetchHosts();
+                createHostSelector(hosts);
+                await updateDashboard('all');
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to remove host: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error('Error removing host:', error);
+            alert('An error occurred while trying to remove the host. Please try again.');
         }
     }
+}
+
+async function handleUpdate() {
+    console.log('Update button clicked');
+    const hostname = document.querySelector('#hostSelector select').value;
+    await updateDashboard(hostname);
 }
 
 function initDashboard() {
@@ -277,10 +174,18 @@ function startDashboardUpdater() {
     }, 60000);  // Update every minute for non-realtime views
 }
 
-async function handleUpdate() {
-    console.log('Update button clicked');
-    const hostname = document.querySelector('#hostSelector select').value;
-    await updateDashboard(hostname);
+function checkUrlForHost() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hostParam = urlParams.get('host');
+    if (hostParam) {
+        const hostSelect = document.getElementById('hostSelect');
+        if (hostSelect) {
+            hostSelect.value = hostParam;
+            updateDashboard(hostParam).then(() => {
+                updateFormVisibility(hostParam);
+            });
+        }
+    }
 }
 
 document.getElementById('alertForm').addEventListener('submit', async (event) => {
