@@ -34,46 +34,59 @@ async function updateDashboard(hostname, isRealtimeUpdate = false) {
         charts = {};
     } else {
         document.getElementById('hostInfo').style.display = 'block';
-        const latestMetrics = await fetchLatestMetrics();
-        console.log('Latest metrics:', latestMetrics);
-        const hostData = latestMetrics[hostname];
-        if (hostData) {
-            const metricNames = Object.keys(hostData.metrics || {});
-            console.log('Metric names:', metricNames);
+        try {
+            const latestMetrics = await fetchLatestMetrics();
+            console.log('Latest metrics:', latestMetrics);
+            const hostData = latestMetrics[hostname];
+            if (hostData) {
+                const metricNames = Object.keys(hostData.metrics || {});
+                console.log('Metric names:', metricNames);
 
-            updateHostInfo(hostname, hostData.tags || {});
+                updateHostInfo(hostname, hostData.tags || {});
 
-            const datasets = {};
-            const fetchPromises = metricNames.map(async (metricName) => {
-                const metricData = await fetchMetricHistory(hostname, metricName, startDate.getTime() / 1000, endDate.getTime() / 1000);
-                console.log(`Fetched data for ${metricName}:`, metricData);
-                datasets[metricName] = processMetricData(metricData, metricName);
-                console.log(`Processed datasets for ${metricName}:`, datasets[metricName]);
-            });
+                const datasets = {};
+                const fetchPromises = metricNames.map(async (metricName) => {
+                    try {
+                        const metricData = await fetchMetricHistory(hostname, metricName, startDate.getTime() / 1000, endDate.getTime() / 1000);
+                        console.log(`Fetched data for ${metricName}:`, metricData);
+                        datasets[metricName] = processMetricData(metricData, metricName);
+                        console.log(`Processed datasets for ${metricName}:`, datasets[metricName]);
+                    } catch (error) {
+                        console.error(`Error processing data for ${metricName}:`, error);
+                    }
+                });
 
-            await Promise.all(fetchPromises);
+                await Promise.all(fetchPromises);
 
-            document.getElementById('chartContainer').innerHTML = '';
-            for (const metricName of metricNames) {
-                const chartDiv = document.createElement('div');
-                chartDiv.className = 'col-12';
-                chartDiv.style.height = '400px';
-                chartDiv.innerHTML = `<canvas id="${metricName}Chart"></canvas>`;
-                document.getElementById('chartContainer').appendChild(chartDiv);
-            }
-
-            for (const metricName of metricNames) {
-                if (charts[metricName]) {
-                    charts[metricName].destroy();
+                document.getElementById('chartContainer').innerHTML = '';
+                for (const metricName of metricNames) {
+                    const chartDiv = document.createElement('div');
+                    chartDiv.className = 'col-md-6';
+                    chartDiv.style.height = '400px';
+                    chartDiv.innerHTML = `<canvas id="${metricName}Chart"></canvas>`;
+                    document.getElementById('chartContainer').appendChild(chartDiv);
                 }
-                charts[metricName] = updateChart(null, metricName, datasets[metricName], startDate, endDate);
+
+                for (const metricName of metricNames) {
+                    if (datasets[metricName] && datasets[metricName].length > 0) {
+                        if (charts[metricName]) {
+                            charts[metricName].destroy();
+                        }
+                        charts[metricName] = updateChart(null, metricName, datasets[metricName], startDate, endDate);
+                    } else {
+                        console.warn(`No valid data for chart: ${metricName}`);
+                    }
+                }
+            } else {
+                console.error(`No data found for hostname: ${hostname}`);
+                updateHostInfo(hostname, {});
+                document.getElementById('chartContainer').innerHTML = '';
+                Object.values(charts).forEach(chart => chart.destroy());
+                charts = {};
             }
-        } else {
-            console.error(`No data found for hostname: ${hostname}`);
-            updateHostInfo(hostname, {});
-            document.getElementById('chartContainer').innerHTML = '';
-            Object.values(charts).forEach(chart => chart.destroy());
-            charts = {};
+        } catch (error) {
+            console.error('Error updating dashboard:', error);
+            document.getElementById('chartContainer').innerHTML = '<p>Error loading dashboard data. Please try again later.</p>';
         }
     }
 
@@ -154,7 +167,7 @@ async function handleUpdate() {
 
 function initDashboard() {
     fetchHosts().then(hosts => {
-        createHostSelector(hosts);
+        createHostSelector(hosts, updateDashboard);
         setupTimeRangeButtons();
         setTimeRange('hour');
         checkUrlForHost();

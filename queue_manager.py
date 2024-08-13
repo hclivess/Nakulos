@@ -1,18 +1,24 @@
-# queue_manager.py
-
-import queue
+import json
+import logging
+from database import get_db
+from queue import Queue
 import threading
 import time
-import logging
-import json
-from database import get_db
 
 logger = logging.getLogger(__name__)
 
+import json
+import logging
+from database import get_db
+from queue import Queue, Empty
+import threading
+import time
+
+logger = logging.getLogger(__name__)
 
 class QueueManager:
     def __init__(self, num_workers=3):
-        self.queue = queue.Queue()
+        self.queue = Queue()
         self.num_workers = num_workers
         self.workers = []
         self.running = False
@@ -46,14 +52,13 @@ class QueueManager:
                 logger.debug(f"Got item from queue: {item}")
                 self._process_item(item)
                 self.queue.task_done()
-            except queue.Empty:
+            except Empty:
                 continue
             except Exception as e:
                 logger.error(f"Error processing item: {e}", exc_info=True)
 
     def _process_item(self, item):
         raise NotImplementedError("_process_item must be implemented in a subclass")
-
 
 class MetricProcessor(QueueManager):
     def __init__(self, num_workers=3):
@@ -70,6 +75,7 @@ class MetricProcessor(QueueManager):
         value = item['value']
         timestamp = item['timestamp']
         tags = item.get('tags', {})
+        message = item.get('message')  # New field for message
 
         logger.info(f"Processing metric: {hostname} - {metric_name}: {value}")
         with self.db.get_cursor() as cursor:
@@ -88,8 +94,8 @@ class MetricProcessor(QueueManager):
 
                 # Insert metric
                 cursor.execute(
-                    "INSERT INTO metrics (host_id, metric_name, timestamp, value) VALUES (%s, %s, %s, %s)",
-                    (host_id, metric_name, timestamp, value)
+                    "INSERT INTO metrics (host_id, metric_name, timestamp, value, message) VALUES (%s, %s, %s, %s, %s)",
+                    (host_id, metric_name, timestamp, json.dumps(value), message)
                 )
 
                 # Check if there's an active downtime
@@ -126,6 +132,8 @@ class MetricProcessor(QueueManager):
                 raise
 
     def _check_alert_condition(self, alert, value):
+        if isinstance(value, dict) and 'value' in value:
+            value = value['value']
         if alert['condition'] == 'above':
             return value > alert['threshold']
         elif alert['condition'] == 'below':
@@ -138,7 +146,7 @@ class MetricProcessor(QueueManager):
         try:
             cursor.execute(
                 "INSERT INTO alert_history (host_id, alert_id, timestamp, value) VALUES (%s, %s, %s, %s)",
-                (alert['host_id'], alert['id'], timestamp, value)
+                (alert['host_id'], alert['id'], timestamp, json.dumps(value))
             )
             logger.info(
                 f"Alert logged to database: alert_id={alert['id']}, host_id={alert['host_id']}, timestamp={timestamp}, value={value}")

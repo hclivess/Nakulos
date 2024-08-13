@@ -92,7 +92,7 @@ function updateFormVisibility(selectedHostname) {
     }
 }
 
-function createHostSelector(hosts) {
+function createHostSelector(hosts, updateDashboard) {
     console.log('Hosts data received:', hosts);
 
     const selector = document.getElementById('hostSelector');
@@ -125,6 +125,7 @@ function createHostSelector(hosts) {
     });
     selector.appendChild(select);
 }
+
 
 function updateHostInfo(hostname, tags) {
     const hostInfoDiv = document.getElementById('hostInfo');
@@ -163,24 +164,88 @@ function updateUrlWithHost(hostname) {
     window.history.pushState({}, '', url);
 }
 
+function updateChart(existingChart, metricName, datasets, startDate, endDate) {
+    const canvasId = `${metricName}Chart`; // Use metricName for unique canvas ID
+    const canvas = document.getElementById(canvasId);
+
+    if (!canvas) {
+        console.error(`Canvas element with id '${canvasId}' not found`);
+        return null;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
+    return new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'minute' },
+                    title: { display: true, text: 'Time' },
+                    min: startDate,
+                    max: endDate,
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Value' },
+                }
+            },
+            plugins: {
+                title: { display: true, text: `${metricName} Over Time` },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y.toFixed(2);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
+}
+
 function processMetricData(metricData, metricName) {
     const datasets = [];
-    if (metricData.length > 0) {
-        const firstPoint = metricData[0].value;
-        const keys = Object.keys(firstPoint);
-        keys.forEach((key, index) => {
-            datasets.push({
-                label: key,
-                data: metricData.map(point => ({
-                    x: new Date(point.timestamp * 1000),
-                    y: point.value[key]
-                })).filter(dataPoint => dataPoint.y !== null),
-                borderColor: getVibrantColor(index),
-                backgroundColor: getVibrantColor(index),
-                fill: false
-            });
-        });
+    console.log(`Processing metric data for ${metricName}:`, metricData);
+
+    if (!Array.isArray(metricData) || metricData.length === 0) {
+        console.warn(`No valid data for metric: ${metricName}`);
+        return datasets;
     }
+
+    const metrics = Object.keys(metricData[0]).filter(key => key !== 'timestamp');
+
+    metrics.forEach((metric, index) => {
+        datasets.push({
+            label: metric,
+            data: metricData.map(point => ({
+                x: new Date(point.timestamp * 1000),
+                y: point[metric].value,
+                message: point[metric].message
+            })).filter(dataPoint => dataPoint.y != null),
+            borderColor: getVibrantColor(index),
+            backgroundColor: getVibrantColor(index),
+            fill: false
+        });
+    });
+
+    console.log(`Processed datasets for ${metricName}:`, datasets);
     return datasets;
 }
 
