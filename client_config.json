@@ -9,7 +9,7 @@
     },
     "client_id": "bcff1bc5-251b-42b7-9acc-50d5b221d70a",
     "secret_key": "your_very_secret_key_here",
-    "last_update": "1723573057",
+    "last_update": "1723575844",
     "active_metrics": [
         "cpu",
         "memory",
