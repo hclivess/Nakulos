@@ -61,7 +61,7 @@ async function updateDashboard(hostname, isRealtimeUpdate = false) {
                 document.getElementById('chartContainer').innerHTML = '';
                 for (const metricName of metricNames) {
                     const chartDiv = document.createElement('div');
-                    chartDiv.className = 'col-md-6';
+                    chartDiv.className = 'col-12';
                     chartDiv.style.height = '400px';
                     chartDiv.innerHTML = `<canvas id="${metricName}Chart"></canvas>`;
                     document.getElementById('chartContainer').appendChild(chartDiv);
