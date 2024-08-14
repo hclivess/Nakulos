@@ -91,35 +91,35 @@ Update your `client_config.json` file to include the following new fields:
 ### Adding Custom Metrics
 
 1. Create a new Python file in the `metrics` directory (e.g., `custom_metric.py`).
-   2. Implement a `collect()` function that returns the metric value:
+2. Implement a `collect()` function that returns the metric value:
 
    ```python
-def collect():
-    metrics = {}
-
-    # Handling system_1
-    try:
-        metrics["system_1"] = {
-            "value": 123
-        }
-    except Exception as e:
-        metrics["system_1"] = {
-            "value": None,
-            "message": f"UnexpectedError: {str(e)}"
-        }
-
-    # Handling system_2
-    try:
-        metrics["system_2"] = {
-            "value": 456
-        }
-    except Exception as e:
-        metrics["system_2"] = {
-            "value": None,
-            "message": f"UnexpectedError: {str(e)}"
-        }
-
-    return metrics
+   def collect():
+       metrics = {}
+   
+       # Handling system_1
+       try:
+           metrics["system_1"] = {
+               "value": 123
+           }
+       except Exception as e:
+           metrics["system_1"] = {
+               "value": None,
+               "message": f"UnexpectedError: {str(e)}"
+           }
+   
+       # Handling system_2
+       try:
+           metrics["system_2"] = {
+               "value": 456
+           }
+       except Exception as e:
+           metrics["system_2"] = {
+               "value": None,
+               "message": f"UnexpectedError: {str(e)}"
+           }
+   
+       return metrics
 
                   
    ```
