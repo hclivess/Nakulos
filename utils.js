@@ -165,7 +165,7 @@ function updateUrlWithHost(hostname) {
 }
 
 function updateChart(existingChart, metricName, datasets, startDate, endDate) {
-    const canvasId = `${metricName}Chart`; // Use metricName for unique canvas ID
+    const canvasId = `${metricName}Chart`;
     const canvas = document.getElementById(canvasId);
 
     if (!canvas) {
@@ -177,6 +177,10 @@ function updateChart(existingChart, metricName, datasets, startDate, endDate) {
     if (existingChart) {
         existingChart.destroy();
     }
+
+    // Ensure valid dates
+    startDate = startDate instanceof Date ? startDate : new Date();
+    endDate = endDate instanceof Date ? endDate : new Date();
 
     return new Chart(ctx, {
         type: 'line',
@@ -206,8 +210,10 @@ function updateChart(existingChart, metricName, datasets, startDate, endDate) {
                             if (label) {
                                 label += ': ';
                             }
-                            if (context.parsed.y !== null) {
+                            if (context.parsed.y !== null && !isNaN(context.parsed.y)) {
                                 label += context.parsed.y.toFixed(2);
+                            } else {
+                                label += 'N/A';
                             }
                             return label;
                         }
@@ -234,11 +240,14 @@ function processMetricData(metricData, metricName) {
     metrics.forEach((metric, index) => {
         datasets.push({
             label: metric,
-            data: metricData.map(point => ({
-                x: new Date(point.timestamp * 1000),
-                y: point[metric].value,
-                message: point[metric].message
-            })).filter(dataPoint => dataPoint.y != null),
+            data: metricData.map(point => {
+                const metricPoint = point[metric] || {};
+                return {
+                    x: new Date(point.timestamp * 1000),
+                    y: metricPoint.value,
+                    message: metricPoint.message
+                };
+            }).filter(dataPoint => dataPoint.y != null && !isNaN(dataPoint.y)),
             borderColor: getVibrantColor(index),
             backgroundColor: getVibrantColor(index),
             fill: false
