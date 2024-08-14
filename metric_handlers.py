@@ -38,19 +38,22 @@ class MetricsHandler(BaseHandler):
             for metric_name, metric_data in metrics.items():
                 if isinstance(metric_data, dict):
                     timestamp = metric_data.get('timestamp', time.time())
-                    value = json.dumps(metric_data)  # Store the entire metric data as JSON
+                    value = metric_data.get('value')
+                    message = metric_data.get('message')
                 else:
                     timestamp = time.time()
-                    value = json.dumps({'value': metric_data})  # Wrap single values in a dict
+                    value = metric_data
+                    message = None
 
-                metric_data = {
+                metric_item = {
                     'hostname': hostname,
                     'metric_name': metric_name,
                     'value': value,
                     'timestamp': timestamp,
-                    'tags': tags
+                    'tags': tags,
+                    'message': message
                 }
-                self.metric_processor.enqueue_metric(metric_data)
+                self.metric_processor.enqueue_metric(metric_item)
 
             self.write({"status": "received"})
         except Exception as e:

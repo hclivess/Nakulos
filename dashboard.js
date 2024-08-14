@@ -1,80 +1,99 @@
 import { initChart, updateChart, addDataToChart, updateChartTimeRange } from './chart.js';
 import { updateAlertConfigs, addAlertConfig, deleteAlertConfig, toggleAlertState, updateRecentAlerts, setupAlertUpdates } from './alerts.js';
 import { updateDowntimes, addDowntime, deleteDowntime } from './downtimes.js';
-import { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility } from './utils.js';
+import { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility, createHostSelector, updateHostInfo, getVibrantColor, processMetricData } from './utils.js';
 
 let charts = {};
 let realtimeUpdateInterval;
 
-const vibrantColors = [
-    '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
-    '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
-    '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
-    '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080'
-];
+async function updateDashboard(hostname, isRealtimeUpdate = false) {
+    console.log('Updating dashboard...');
+    console.log('Selected hostname:', hostname);
 
-function getVibrantColor(index) {
-    return vibrantColors[index % vibrantColors.length];
-}
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    let startDate = new Date(startDateInput.value);
+    let endDate = new Date(endDateInput.value);
 
-function updateUrlWithHost(hostname) {
-    const url = new URL(window.location);
-    url.searchParams.set('host', hostname);
-    window.history.pushState({}, '', url);
-}
+    const activeTimeRangeButton = document.querySelector('.dropdown-item.active');
+    const isCustomRange = !activeTimeRangeButton;
 
-function createHostSelector(hosts) {
-    console.log('Hosts data received:', hosts);
+    if (isRealtimeUpdate && !isCustomRange) {
+        endDate = new Date();
+        const timeDiff = endDate - startDate;
+        startDate = new Date(endDate - timeDiff);
 
-    const selector = document.getElementById('hostSelector');
-    selector.innerHTML = '<label for="hostSelect" class="form-label">Select Host:</label>';
-    const select = document.createElement('select');
-    select.id = 'hostSelect';
-    select.className = 'form-select';
-
-    const allOption = document.createElement('option');
-    allOption.value = 'all';
-    allOption.textContent = 'All Hosts';
-    select.appendChild(allOption);
-
-    if (typeof hosts === 'object' && hosts !== null) {
-        Object.entries(hosts).forEach(([hostname, hostData]) => {
-            const option = document.createElement('option');
-            option.value = hostname;
-            option.textContent = hostData.tags && hostData.tags.alias ? hostData.tags.alias : hostname;
-            select.appendChild(option);
-        });
-    } else {
-        console.error('Unexpected hosts data format:', hosts);
+        startDateInput.value = startDate.toISOString().slice(0, 16);
+        endDateInput.value = endDate.toISOString().slice(0, 16);
     }
 
-    select.addEventListener('change', async () => {
-        const selectedHostname = select.value;
-        updateUrlWithHost(selectedHostname);
-        await updateDashboard(selectedHostname);
-        updateFormVisibility(selectedHostname);
-    });
-    selector.appendChild(select);
-}
-
-function updateHostInfo(hostname, tags) {
-    const hostInfoDiv = document.getElementById('hostInfo');
-    if (hostInfoDiv) {
-        let content = `<p><strong>Hostname: </strong>${hostname}</p>
-                       <div class="d-flex flex-wrap gap-2">`;
-
-        if (tags && typeof tags === 'object' && Object.keys(tags).length > 0) {
-            for (const [key, value] of Object.entries(tags)) {
-                content += `<span class="badge bg-secondary">${key}: ${value}</span>`;
-            }
-        } else {
-            content += '<span class="badge bg-secondary">No tags</span>';
-        }
-
-        content += '</div>';
-        hostInfoDiv.innerHTML = content;
+    if (hostname === 'all') {
+        document.getElementById('hostInfo').style.display = 'none';
+        document.getElementById('chartContainer').innerHTML = '';
+        Object.values(charts).forEach(chart => chart.destroy());
+        charts = {};
     } else {
-        console.warn("Element with id 'hostInfo' not found");
+        document.getElementById('hostInfo').style.display = 'block';
+        try {
+            const latestMetrics = await fetchLatestMetrics();
+            console.log('Latest metrics:', latestMetrics);
+            const hostData = latestMetrics[hostname];
+            if (hostData) {
+                const metricNames = Object.keys(hostData.metrics || {});
+                console.log('Metric names:', metricNames);
+
+                updateHostInfo(hostname, hostData.tags || {});
+
+                const datasets = {};
+                const fetchPromises = metricNames.map(async (metricName) => {
+                    try {
+                        const metricData = await fetchMetricHistory(hostname, metricName, startDate.getTime() / 1000, endDate.getTime() / 1000);
+                        console.log(`Fetched data for ${metricName}:`, metricData);
+                        datasets[metricName] = processMetricData(metricData, metricName);
+                        console.log(`Processed datasets for ${metricName}:`, datasets[metricName]);
+                    } catch (error) {
+                        console.error(`Error processing data for ${metricName}:`, error);
+                    }
+                });
+
+                await Promise.all(fetchPromises);
+
+                document.getElementById('chartContainer').innerHTML = '';
+                for (const metricName of metricNames) {
+                    const chartDiv = document.createElement('div');
+                    chartDiv.className = 'col-12';
+                    chartDiv.style.height = '400px';
+                    chartDiv.innerHTML = `<canvas id="${metricName}Chart"></canvas>`;
+                    document.getElementById('chartContainer').appendChild(chartDiv);
+                }
+
+                for (const metricName of metricNames) {
+                    if (datasets[metricName] && datasets[metricName].length > 0) {
+                        if (charts[metricName]) {
+                            charts[metricName].destroy();
+                        }
+                        charts[metricName] = updateChart(null, metricName, datasets[metricName], startDate, endDate);
+                    } else {
+                        console.warn(`No valid data for chart: ${metricName}`);
+                    }
+                }
+            } else {
+                console.error(`No data found for hostname: ${hostname}`);
+                updateHostInfo(hostname, {});
+                document.getElementById('chartContainer').innerHTML = '';
+                Object.values(charts).forEach(chart => chart.destroy());
+                charts = {};
+            }
+        } catch (error) {
+            console.error('Error updating dashboard:', error);
+            document.getElementById('chartContainer').innerHTML = '<p>Error loading dashboard data. Please try again later.</p>';
+        }
+    }
+
+    if (!isRealtimeUpdate) {
+        await updateRecentAlerts(hostname);
+        await updateDowntimes(hostname);
+        await updateAlertConfigs(hostname);
     }
 }
 
@@ -140,124 +159,15 @@ async function removeSelectedHost() {
     }
 }
 
-async function updateDashboard(hostname, isRealtimeUpdate = false) {
-    console.log('Updating dashboard...');
-    console.log('Selected hostname:', hostname);
-
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
-    let startDate = new Date(startDateInput.value);
-    let endDate = new Date(endDateInput.value);
-
-    // Check if we're using a preset time range
-    const activeTimeRangeButton = document.querySelector('.dropdown-item.active');
-    const isCustomRange = !activeTimeRangeButton;
-
-    // If it's a real-time update and not a custom range, move the end date to now
-    if (isRealtimeUpdate && !isCustomRange) {
-        endDate = new Date();
-        const timeDiff = endDate - startDate;
-        startDate = new Date(endDate - timeDiff);
-
-        startDateInput.value = startDate.toISOString().slice(0, 16);
-        endDateInput.value = endDate.toISOString().slice(0, 16);
-    }
-
-    if (hostname === 'all') {
-        document.getElementById('hostInfo').style.display = 'none';
-        document.getElementById('chartContainer').innerHTML = '';
-        Object.values(charts).forEach(chart => chart.destroy());
-        charts = {};
-    } else {
-        document.getElementById('hostInfo').style.display = 'block';
-        const latestMetrics = await fetchLatestMetrics();
-        console.log('Latest metrics:', latestMetrics);
-        const hostData = latestMetrics[hostname];
-        if (hostData) {
-            const metricNames = Object.keys(hostData.metrics || {});
-            console.log('Metric names:', metricNames);
-
-            updateHostInfo(hostname, hostData.tags || {});
-
-            const datasets = {};
-            const fetchPromises = metricNames.map(async (metricName) => {
-                const metricData = await fetchMetricHistory(hostname, metricName, startDate.getTime() / 1000, endDate.getTime() / 1000);
-                console.log(`Fetched data for ${metricName}:`, metricData);
-                datasets[metricName] = processMetricData(metricData, metricName);
-                console.log(`Processed datasets for ${metricName}:`, datasets[metricName]);
-            });
-
-            await Promise.all(fetchPromises);
-
-            document.getElementById('chartContainer').innerHTML = '';
-            for (const metricName of metricNames) {
-                const chartDiv = document.createElement('div');
-                chartDiv.className = 'col-12';
-                chartDiv.style.height = '400px';
-                chartDiv.innerHTML = `<canvas id="${metricName}Chart"></canvas>`;
-                document.getElementById('chartContainer').appendChild(chartDiv);
-            }
-
-            for (const metricName of metricNames) {
-                if (charts[metricName]) {
-                    charts[metricName].destroy();
-                }
-                charts[metricName] = updateChart(null, metricName, datasets[metricName], startDate, endDate);
-            }
-        } else {
-            console.error(`No data found for hostname: ${hostname}`);
-            updateHostInfo(hostname, {});
-            document.getElementById('chartContainer').innerHTML = '';
-            Object.values(charts).forEach(chart => chart.destroy());
-            charts = {};
-        }
-    }
-
-    if (!isRealtimeUpdate) {
-        await updateRecentAlerts(hostname);
-        await updateDowntimes(hostname);
-        await updateAlertConfigs(hostname);
-    }
-}
-
-function processMetricData(metricData, metricName) {
-    const datasets = [];
-    if (metricData.length > 0) {
-        const firstPoint = metricData[0].value;
-        const keys = Object.keys(firstPoint);
-        keys.forEach((key, index) => {
-            datasets.push({
-                label: key,
-                data: metricData.map(point => ({
-                    x: new Date(point.timestamp * 1000),
-                    y: point.value[key]
-                })).filter(dataPoint => dataPoint.y !== null),
-                borderColor: getVibrantColor(index),
-                backgroundColor: getVibrantColor(index),
-                fill: false
-            });
-        });
-    }
-    return datasets;
-}
-
-function checkUrlForHost() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const hostParam = urlParams.get('host');
-    if (hostParam) {
-        const hostSelect = document.getElementById('hostSelect');
-        if (hostSelect) {
-            hostSelect.value = hostParam;
-            updateDashboard(hostParam).then(() => {
-                updateFormVisibility(hostParam);
-            });
-        }
-    }
+async function handleUpdate() {
+    console.log('Update button clicked');
+    const hostname = document.querySelector('#hostSelector select').value;
+    await updateDashboard(hostname);
 }
 
 function initDashboard() {
     fetchHosts().then(hosts => {
-        createHostSelector(hosts);
+        createHostSelector(hosts, updateDashboard);
         setupTimeRangeButtons();
         setTimeRange('hour');
         checkUrlForHost();
@@ -277,10 +187,18 @@ function startDashboardUpdater() {
     }, 60000);  // Update every minute for non-realtime views
 }
 
-async function handleUpdate() {
-    console.log('Update button clicked');
-    const hostname = document.querySelector('#hostSelector select').value;
-    await updateDashboard(hostname);
+function checkUrlForHost() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hostParam = urlParams.get('host');
+    if (hostParam) {
+        const hostSelect = document.getElementById('hostSelect');
+        if (hostSelect) {
+            hostSelect.value = hostParam;
+            updateDashboard(hostParam).then(() => {
+                updateFormVisibility(hostParam);
+            });
+        }
+    }
 }
 
 document.getElementById('alertForm').addEventListener('submit', async (event) => {

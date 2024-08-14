@@ -103,7 +103,8 @@ def init_db(config):
                     host_id INTEGER REFERENCES hosts(id) ON DELETE CASCADE,
                     metric_name VARCHAR(255) NOT NULL,
                     timestamp FLOAT NOT NULL,
-                    value JSONB NOT NULL
+                    value JSONB NOT NULL,
+                    message TEXT
                 )
             '''),
             ("alerts", '''
