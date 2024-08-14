@@ -1,8 +1,16 @@
 import psutil
 
 def collect():
-    return len(psutil.users())
+    metrics = {}
+
+    try:
+        user_count = len(psutil.users())
+        metrics['user_count'] = {'value': user_count}
+    except Exception as e:
+        metrics['user_count'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+    return metrics
 
 if __name__ == "__main__":
-    user_count = collect()
-    print(f"Number of logged-in users: {user_count}")
+    result = collect()
+    print(result)

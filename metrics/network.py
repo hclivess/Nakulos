@@ -1,17 +1,43 @@
 import psutil
 
 def collect():
-    net_io = psutil.net_io_counters()
-    return {
-        'bytes_recv': net_io.bytes_recv,
-        'bytes_sent': net_io.bytes_sent,
-        'packets_recv': net_io.packets_recv,
-        'packets_sent': net_io.packets_sent
-    }
+    metrics = {}
+
+    try:
+        net_io = psutil.net_io_counters()
+
+        try:
+            bytes_recv = net_io.bytes_recv
+            metrics['bytes_recv'] = {'value': bytes_recv}
+        except Exception as e:
+            metrics['bytes_recv'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+        try:
+            bytes_sent = net_io.bytes_sent
+            metrics['bytes_sent'] = {'value': bytes_sent}
+        except Exception as e:
+            metrics['bytes_sent'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+        try:
+            packets_recv = net_io.packets_recv
+            metrics['packets_recv'] = {'value': packets_recv}
+        except Exception as e:
+            metrics['packets_recv'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+        try:
+            packets_sent = net_io.packets_sent
+            metrics['packets_sent'] = {'value': packets_sent}
+        except Exception as e:
+            metrics['packets_sent'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+    except Exception as e:
+        metrics['bytes_recv'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+        metrics['bytes_sent'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+        metrics['packets_recv'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+        metrics['packets_sent'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+    return metrics
 
 if __name__ == "__main__":
-    network_metrics = collect()
-    print(f"Bytes received: {network_metrics['bytes_recv']}")
-    print(f"Bytes sent: {network_metrics['bytes_sent']}")
-    print(f"Packets received: {network_metrics['packets_recv']}")
-    print(f"Packets sent: {network_metrics['packets_sent']}")
+    result = collect()
+    print(result)

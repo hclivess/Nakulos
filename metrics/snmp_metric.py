@@ -25,6 +25,8 @@ def simple_snmp_get(host='localhost', port=161, oid=0, timeout=2):
         sock.close()
 
 def collect(host='localhost', port=161):
+    metrics = {}
+
     oids = {
         'sysUpTime': 0,
         'ifInOctets': 1,
@@ -32,8 +34,6 @@ def collect(host='localhost', port=161):
         'cpuUsage': 3
     }
 
-    results = {}
-    errors = []
     total_time = 0
 
     for oid_name, oid in oids.items():
@@ -41,21 +41,14 @@ def collect(host='localhost', port=161):
         total_time += query_time
 
         if value is not None:
-            results[oid_name] = value
-        if error:
-            errors.append(f"{oid_name}: {error}")
+            metrics[oid_name] = {'value': value}
+        else:
+            metrics[oid_name] = {'value': None, 'message': error}
 
-    return results, errors, total_time
+    metrics['total_query_time'] = {'value': total_time}
+
+    return metrics
 
 if __name__ == "__main__":
-    start_time = time.time()
-    result, errors, query_time = collect()
-    end_time = time.time()
-
-    print(f"Simple SNMP-like Collection Results: {result}")
-    if errors:
-        print("Errors encountered:")
-        for error in errors:
-            print(f"- {error}")
-    print(f"Total query time: {query_time:.2f} seconds")
-    print(f"Total collection time: {end_time - start_time:.2f} seconds")
+    result = collect()
+    print(result)

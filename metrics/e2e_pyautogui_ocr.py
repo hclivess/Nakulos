@@ -7,9 +7,10 @@ import time
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 def collect():
+    metrics = {}
     start_time = time.time()
+
     try:
         # Move mouse to specific coordinates and click
         pyautogui.click(100, 200)
@@ -26,36 +27,31 @@ def collect():
         else:
             logging.info(f"OCR Result: {text[:50]}...")  # Log first 50 characters
 
+        metrics['char_count'] = {'value': char_count}
+
         # Find and click an image on screen
         location = pyautogui.locateOnScreen('button.png', confidence=0.8)
         if location:
             pyautogui.click(location)
             logging.info("Button 'button.png' found and clicked")
-            button_found = 1
+            metrics['button_found'] = {'value': 1}
         else:
             logging.warning("Button image 'button.png' not found on screen")
-            button_found = 0
+            metrics['button_found'] = {'value': 0}
 
-        success = 1
+        metrics['success'] = {'value': 1}
+
     except Exception as e:
         logging.error(f"An error occurred: {str(e)}")
-        success = 0
-        char_count = 0
-        button_found = 0
+        metrics['success'] = {'value': 0, 'message': f"UnexpectedError: {str(e)}"}
+        metrics['char_count'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+        metrics['button_found'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
 
     execution_time = time.time() - start_time
+    metrics['execution_time'] = {'value': execution_time}
 
-    return {
-        'success': success,
-        'char_count': char_count,
-        'button_found': button_found,
-        'execution_time': execution_time
-    }
-
+    return metrics
 
 if __name__ == "__main__":
     result = collect()
-    print(f"Test result: {'Success' if result['success'] == 1 else 'Failure'}")
-    print(f"OCR character count: {result['char_count']}")
-    print(f"Button found: {'Yes' if result['button_found'] == 1 else 'No'}")
-    print(f"Execution time: {result['execution_time']:.2f} seconds")
+    print(result)

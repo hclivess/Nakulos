@@ -1,14 +1,28 @@
 import psutil
 
 def collect():
-    return {
-        'total_process_count': len(psutil.pids()),
-        'running_process_count': len([p for p in psutil.process_iter(['status']) if p.info['status'] == psutil.STATUS_RUNNING]),
-        'zombie_process_count': len([p for p in psutil.process_iter(['status']) if p.info['status'] == psutil.STATUS_ZOMBIE])
-    }
+    metrics = {}
+
+    try:
+        total_process_count = len(psutil.pids())
+        metrics['total_process_count'] = {'value': total_process_count}
+    except Exception as e:
+        metrics['total_process_count'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+    try:
+        running_process_count = len([p for p in psutil.process_iter(['status']) if p.info['status'] == psutil.STATUS_RUNNING])
+        metrics['running_process_count'] = {'value': running_process_count}
+    except Exception as e:
+        metrics['running_process_count'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+    try:
+        zombie_process_count = len([p for p in psutil.process_iter(['status']) if p.info['status'] == psutil.STATUS_ZOMBIE])
+        metrics['zombie_process_count'] = {'value': zombie_process_count}
+    except Exception as e:
+        metrics['zombie_process_count'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
+    return metrics
 
 if __name__ == "__main__":
-    process_metrics = collect()
-    print(f"Total process count: {process_metrics['total_process_count']}")
-    print(f"Running process count: {process_metrics['running_process_count']}")
-    print(f"Zombie process count: {process_metrics['zombie_process_count']}")
+    result = collect()
+    print(result)
