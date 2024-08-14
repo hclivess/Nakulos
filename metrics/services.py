@@ -2,40 +2,60 @@ import psutil
 import platform
 
 def collect():
-    metrics = {
-        'total_services': 0,
-        'running_services': 0,
-        'stopped_services': 0
-    }
+    metrics = {}
 
     if platform.system() == 'Windows':
-        for service in psutil.win_service_iter():
-            metrics['total_services'] += 1
-            try:
-                service_info = service.as_dict()
-                if service_info['status'] == 'running':
-                    metrics['running_services'] += 1
-                elif service_info['status'] == 'stopped':
-                    metrics['stopped_services'] += 1
-            except psutil.NoSuchProcess:
-                pass
+        try:
+            total_services = 0
+            running_services = 0
+            stopped_services = 0
+
+            for service in psutil.win_service_iter():
+                total_services += 1
+                try:
+                    service_info = service.as_dict()
+                    if service_info['status'] == 'running':
+                        running_services += 1
+                    elif service_info['status'] == 'stopped':
+                        stopped_services += 1
+                except psutil.NoSuchProcess:
+                    pass
+
+            metrics['total_services'] = {'value': total_services}
+            metrics['running_services'] = {'value': running_services}
+            metrics['stopped_services'] = {'value': stopped_services}
+        except Exception as e:
+            metrics['total_services'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+            metrics['running_services'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+            metrics['stopped_services'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+
     elif platform.system() == 'Linux':
-        for unit in psutil.process_iter(['name', 'status']):
-            try:
-                if unit.name().endswith('.service'):
-                    metrics['total_services'] += 1
-                    if unit.status() == psutil.STATUS_RUNNING:
-                        metrics['running_services'] += 1
-                    else:
-                        metrics['stopped_services'] += 1
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
+        try:
+            total_services = 0
+            running_services = 0
+            stopped_services = 0
+
+            for unit in psutil.process_iter(['name', 'status']):
+                try:
+                    if unit.name().endswith('.service'):
+                        total_services += 1
+                        if unit.status() == psutil.STATUS_RUNNING:
+                            running_services += 1
+                        else:
+                            stopped_services += 1
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            metrics['total_services'] = {'value': total_services}
+            metrics['running_services'] = {'value': running_services}
+            metrics['stopped_services'] = {'value': stopped_services}
+        except Exception as e:
+            metrics['total_services'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+            metrics['running_services'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
+            metrics['stopped_services'] = {'value': None, 'message': f"UnexpectedError: {str(e)}"}
 
     return metrics
 
 if __name__ == "__main__":
     result = collect()
-    print(f"Operating System: {platform.system()}")
-    print(f"Total services: {result['total_services']}")
-    print(f"Running services: {result['running_services']}")
-    print(f"Stopped services: {result['stopped_services']}")
+    print(result)
