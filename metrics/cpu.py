@@ -8,7 +8,6 @@ def collect():
     return {
         'cpu_percent': {
             'value': psutil.cpu_percent(interval=1),
-            'message': 'this is a test'
         },
         'cpu_user': {
             'value': cpu_times_percent.user,
