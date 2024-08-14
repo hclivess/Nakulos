@@ -4,52 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitoring Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <style>
-        .chart-container { height: 400px; }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/moment"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
 </head>
 <body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/dashboard">Monitoring Dashboard</a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="/admin">Admin Panel</a>
+                <a class="nav-link" href="/logout" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
+            </div>
+        </div>
+    </nav>
 
     <div class="container mt-4">
-        <nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="/dashboard">Monitoring Dashboard</a>
-    <div class="navbar-nav">
-      <a class="nav-link" href="/admin">Admin Panel</a>
-        <a class="nav-link" href="/logout" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
-
-    </div>
-  </div>
-</nav>
         <div class="row mb-4">
-            <div class="col-md-3" id="hostSelector"></div>
+            <div id="hostSelector" class="col-md-3"></div>
             <div class="col-md-3">
                 <label for="startDate" class="form-label">Start Date:</label>
-                <input type="datetime-local" class="form-control" id="startDate">
+                <input type="datetime-local" id="startDate" class="form-control">
             </div>
             <div class="col-md-3">
                 <label for="endDate" class="form-label">End Date:</label>
-                <input type="datetime-local" class="form-control" id="endDate">
+                <input type="datetime-local" id="endDate" class="form-control">
             </div>
             <div class="col-md-3 d-flex align-items-end">
                 <div class="btn-group me-2" role="group">
-                    <button class="btn btn-primary" id="updateButton"">Update</button>
-                    <button class="btn btn-danger" id="removeHostButton">Remove Host</button>
+                    <button id="updateButton" class="btn btn-primary">Update</button>
+                    <button id="removeHostButton" class="btn btn-danger">Remove Host</button>
                 </div>
-
                 <div class="dropdown">
                     <button class="btn btn-secondary dropdown-toggle" type="button" id="timeRangeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                         Time Range
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="timeRangeDropdown">
-                        <li><a class="dropdown-item" href="#" id="lastRealtimeButton">Realtime</a></li>
-                        <li><a class="dropdown-item" href="#" id="lastHourButton">Last Hour</a></li>
-                        <li><a class="dropdown-item" href="#" id="lastDayButton">Last Day</a></li>
-                        <li><a class="dropdown-item" href="#" id="lastWeekButton">Last Week</a></li>
-                        <li><a class="dropdown-item" href="#" id="lastMonthButton">Last Month</a></li>
+                        <li><a class="dropdown-item" id="lastRealtimeButton" href="#">Realtime</a></li>
+                        <li><a class="dropdown-item" id="lastHourButton" href="#">Last Hour</a></li>
+                        <li><a class="dropdown-item" id="lastDayButton" href="#">Last Day</a></li>
+                        <li><a class="dropdown-item" id="lastWeekButton" href="#">Last Week</a></li>
+                        <li><a class="dropdown-item" id="lastMonthButton" href="#">Last Month</a></li>
                     </ul>
                 </div>
             </div>
@@ -57,38 +53,36 @@
 
         <div id="hostInfo" class="alert alert-info mb-4"></div>
 
-        <div id="chartContainer" class="row">
-          <!-- Charts will be dynamically added here -->
-        </div>
+        <div id="chartContainer" class="row"></div>
 
-        <div class="row">
+        <div class="row mt-5">
             <div class="col-md-6">
                 <h2>Alert Configuration</h2>
                 <div id="alertConfigList" class="mb-4"></div>
                 <h3>Add New Alert</h3>
-                <form id="alertForm" class="mb-4">
-                    <div class="mb-3" id="hostnameField">
+                <form id="alertForm">
+                    <div id="hostnameField" class="mb-3">
                         <label for="hostname" class="form-label">Hostname:</label>
-                        <input type="text" class="form-control" id="hostname" required>
+                        <input type="text" id="hostname" name="hostname" class="form-control" required>
                     </div>
                     <div class="mb-3">
                         <label for="metric_name" class="form-label">Metric:</label>
-                        <input type="text" class="form-control" id="metric_name" required>
+                        <input type="text" id="metric_name" name="metric_name" class="form-control" required>
                     </div>
                     <div class="mb-3">
                         <label for="condition" class="form-label">Condition:</label>
-                        <select class="form-select" id="condition" required>
+                        <select id="condition" name="condition" class="form-select" required>
                             <option value="above">Above</option>
                             <option value="below">Below</option>
                         </select>
                     </div>
                     <div class="mb-3">
                         <label for="threshold" class="form-label">Threshold:</label>
-                        <input type="number" class="form-control" id="threshold" required>
+                        <input type="number" id="threshold" name="threshold" class="form-control" required>
                     </div>
                     <div class="mb-3">
                         <label for="duration" class="form-label">Duration (seconds):</label>
-                        <input type="number" class="form-control" id="duration" required>
+                        <input type="number" id="duration" name="duration" class="form-control" required>
                     </div>
                     <button type="submit" class="btn btn-primary">Add Alert</button>
                 </form>
@@ -99,35 +93,40 @@
             </div>
         </div>
 
-        <div class="row mt-4">
+        <div class="row mt-5">
             <div class="col-md-6">
                 <h2>Downtimes</h2>
                 <div id="downtimeList" class="mb-4"></div>
                 <h3>Add New Downtime</h3>
-                <form id="downtimeForm" class="mb-4">
-                    <div class="mb-3" id="downtimeHostnameField">
+                <form id="downtimeForm">
+                    <div id="downtimeHostnameField" class="mb-3">
                         <label for="downtimeHostname" class="form-label">Hostname:</label>
-                        <input type="text" class="form-control" id="downtimeHostname" required>
+                        <input type="text" id="downtimeHostname" name="downtimeHostname" class="form-control" required>
                     </div>
                     <div class="mb-3">
                         <label for="downtimeStart" class="form-label">Start Time:</label>
-                        <input type="datetime-local" class="form-control" id="downtimeStart" required>
+                        <input type="datetime-local" id="downtimeStart" name="downtimeStart" class="form-control" required>
                     </div>
                     <div class="mb-3">
                         <label for="downtimeEnd" class="form-label">End Time:</label>
-                        <input type="datetime-local" class="form-control" id="downtimeEnd" required>
+                        <input type="datetime-local" id="downtimeEnd" name="downtimeEnd" class="form-control" required>
                     </div>
                     <button type="submit" class="btn btn-primary">Add Downtime</button>
                 </form>
             </div>
         </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3>Metric Messages</h3>
+                <div id="messageContainer" class="border p-3 bg-light">
+                    <!-- Messages will be displayed here -->
+                </div>
+            </div>
+        </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="chart.js"></script>
-    <script type="module" src="alerts.js"></script>
-    <script type="module" src="downtimes.js"></script>
-    <script type="module" src="utils.js"></script>
-    <script type="module" src="dashboard.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="/dashboard.js"></script>
 </body>
 </html>

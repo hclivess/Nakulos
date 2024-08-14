@@ -122,7 +122,7 @@ class FetchHistoryHandler(BaseHandler):
 
             with self.db.get_cursor() as cursor:
                 cursor.execute("""
-                    SELECT m.timestamp, m.value
+                    SELECT m.timestamp, m.value, m.message
                     FROM metrics m
                     JOIN hosts h ON m.host_id = h.id
                     WHERE h.hostname = %s AND m.metric_name = %s AND m.timestamp BETWEEN %s AND %s
@@ -146,6 +146,8 @@ class FetchHistoryHandler(BaseHandler):
                     value = {'value': value}  # Wrap non-dict values
 
                 data_point.update(value)
+                if point['message']:
+                    data_point['message'] = point['message']
                 result.append(data_point)
 
             if len(result) > limit:

@@ -126,7 +126,6 @@ function createHostSelector(hosts, updateDashboard) {
     selector.appendChild(select);
 }
 
-
 function updateHostInfo(hostname, tags) {
     const hostInfoDiv = document.getElementById('hostInfo');
     if (hostInfoDiv) {
@@ -164,66 +163,151 @@ function updateUrlWithHost(hostname) {
     window.history.pushState({}, '', url);
 }
 
-function updateChart(existingChart, metricName, datasets, startDate, endDate) {
-    const canvasId = `${metricName}Chart`;
-    const canvas = document.getElementById(canvasId);
+async function updateDashboard(hostname, isRealtimeUpdate = false) {
+    console.log('Updating dashboard...');
+    console.log('Selected hostname:', hostname);
 
-    if (!canvas) {
-        console.error(`Canvas element with id '${canvasId}' not found`);
-        return null;
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    let startDate = new Date(startDateInput.value);
+    let endDate = new Date(endDateInput.value);
+
+    const activeTimeRangeButton = document.querySelector('.dropdown-item.active');
+    const isCustomRange = !activeTimeRangeButton;
+
+    if (isRealtimeUpdate && !isCustomRange) {
+        endDate = new Date();
+        const timeDiff = endDate - startDate;
+        startDate = new Date(endDate - timeDiff);
+
+        startDateInput.value = startDate.toISOString().slice(0, 16);
+        endDateInput.value = endDate.toISOString().slice(0, 16);
     }
 
-    const ctx = canvas.getContext('2d');
-    if (existingChart) {
-        existingChart.destroy();
-    }
+    if (hostname === 'all') {
+        document.getElementById('hostInfo').style.display = 'none';
+        document.getElementById('chartContainer').innerHTML = '';
+        Object.values(charts).forEach(chart => chart.destroy());
+        charts = {};
+    } else {
+        document.getElementById('hostInfo').style.display = 'block';
+        try {
+            const latestMetrics = await fetchLatestMetrics();
+            console.log('Latest metrics:', latestMetrics);
+            const hostData = latestMetrics[hostname];
+            if (hostData) {
+                const metricNames = Object.keys(hostData.metrics || {});
+                console.log('Metric names:', metricNames);
 
-    // Ensure valid dates
-    startDate = startDate instanceof Date ? startDate : new Date();
-    endDate = endDate instanceof Date ? endDate : new Date();
+                updateHostInfo(hostname, hostData.tags || {});
 
-    return new Chart(ctx, {
-        type: 'line',
-        data: { datasets },
-        options: {
-            scales: {
-                x: {
-                    type: 'time',
-                    time: { unit: 'minute' },
-                    title: { display: true, text: 'Time' },
-                    min: startDate,
-                    max: endDate,
-                },
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Value' },
+                const datasets = {};
+                const messages = [];
+                const fetchPromises = metricNames.map(async (metricName) => {
+                    try {
+                        const metricData = await fetchMetricHistory(hostname, metricName, startDate.getTime() / 1000, endDate.getTime() / 1000);
+                        console.log(`Fetched data for ${metricName}:`, metricData);
+                        datasets[metricName] = processMetricData(metricData, metricName);
+                        console.log(`Processed datasets for ${metricName}:`, datasets[metricName]);
+
+                        // Collect messages from the metric data
+                        metricData.forEach(point => {
+                            Object.entries(point).forEach(([subMetricName, subMetricData]) => {
+                                if (subMetricData && typeof subMetricData === 'object' && 'message' in subMetricData) {
+                                    console.log(`Found message for ${metricName}.${subMetricName}:`, subMetricData.message);
+                                    messages.push({
+                                        timestamp: new Date(point.timestamp * 1000),
+                                        metricName: `${metricName}.${subMetricName}`,
+                                        message: subMetricData.message
+                                    });
+                                }
+                            });
+                        });
+                    } catch (error) {
+                        console.error(`Error processing data for ${metricName}:`, error);
+                    }
+                });
+
+                await Promise.all(fetchPromises);
+
+                console.log('All collected messages:', messages);
+
+                document.getElementById('chartContainer').innerHTML = '';
+                for (const metricName of metricNames) {
+                    const chartDiv = document.createElement('div');
+                    chartDiv.className = 'col-12';
+                    chartDiv.style.height = '400px';
+                    chartDiv.innerHTML = `<canvas id="${metricName}Chart"></canvas>`;
+                    document.getElementById('chartContainer').appendChild(chartDiv);
                 }
-            },
-            plugins: {
-                title: { display: true, text: `${metricName} Over Time` },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null && !isNaN(context.parsed.y)) {
-                                label += context.parsed.y.toFixed(2);
-                            } else {
-                                label += 'N/A';
-                            }
-                            return label;
+
+                for (const metricName of metricNames) {
+                    if (datasets[metricName] && datasets[metricName].length > 0) {
+                        if (charts[metricName]) {
+                            charts[metricName].destroy();
                         }
+                        charts[metricName] = updateChart(null, metricName, datasets[metricName], startDate, endDate);
+                    } else {
+                        console.warn(`No valid data for chart: ${metricName}`);
                     }
                 }
-            },
-            responsive: true,
-            maintainAspectRatio: false,
+
+                // Display messages
+                displayMessages(messages);
+            } else {
+                console.error(`No data found for hostname: ${hostname}`);
+                updateHostInfo(hostname, {});
+                document.getElementById('chartContainer').innerHTML = '';
+                Object.values(charts).forEach(chart => chart.destroy());
+                charts = {};
+            }
+        } catch (error) {
+            console.error('Error updating dashboard:', error);
+            document.getElementById('chartContainer').innerHTML = '<p>Error loading dashboard data. Please try again later.</p>';
         }
+    }
+
+    if (!isRealtimeUpdate) {
+        await updateRecentAlerts(hostname);
+        await updateDowntimes(hostname);
+        await updateAlertConfigs(hostname);
+    }
+}
+
+function displayMessages(messages) {
+    console.log('Displaying messages:', messages);
+    const messageContainer = document.getElementById('messageContainer');
+    if (!messageContainer) {
+        console.error('Message container not found in the DOM');
+        return;
+    }
+    messageContainer.innerHTML = '';
+
+    if (messages.length === 0) {
+        console.log('No messages to display');
+        messageContainer.innerHTML = '<p>No messages to display.</p>';
+        return;
+    }
+
+    const messageList = document.createElement('ul');
+    messageList.className = 'list-group';
+
+    messages.sort((a, b) => b.timestamp - a.timestamp);  // Sort messages by timestamp, newest first
+
+    messages.forEach(msg => {
+        console.log('Creating list item for message:', msg);
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item';
+        listItem.innerHTML = `
+            <strong>${msg.timestamp.toLocaleString()}</strong> -
+            <span class="badge bg-secondary">${msg.metricName}</span>:
+            ${msg.message}
+        `;
+        messageList.appendChild(listItem);
     });
+
+    messageContainer.appendChild(messageList);
+    console.log('Messages displayed successfully');
 }
 
 function processMetricData(metricData, metricName) {
@@ -258,4 +342,17 @@ function processMetricData(metricData, metricName) {
     return datasets;
 }
 
-export { fetchHosts, fetchLatestMetrics, fetchMetricHistory, setTimeRange, updateFormVisibility, createHostSelector, updateHostInfo, getVibrantColor, processMetricData, updateUrlWithHost };
+export {
+    fetchHosts,
+    fetchLatestMetrics,
+    fetchMetricHistory,
+    setTimeRange,
+    updateFormVisibility,
+    createHostSelector,
+    updateHostInfo,
+    getVibrantColor,
+    updateUrlWithHost,
+    updateDashboard,
+    displayMessages,
+    processMetricData
+};
