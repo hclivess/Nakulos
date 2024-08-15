@@ -118,7 +118,7 @@ class FetchHistoryHandler(BaseHandler):
         try:
             start = float(self.get_argument("start", 0))
             end = float(self.get_argument("end", time.time()))
-            limit = int(self.get_argument("limit", 500))
+            target_points = int(self.get_argument("target_points", 500))  # Changed from limit to target_points
 
             with self.db.get_cursor() as cursor:
                 cursor.execute("""
@@ -150,9 +150,15 @@ class FetchHistoryHandler(BaseHandler):
                     data_point['message'] = point['message']
                 result.append(data_point)
 
-            if len(result) > limit:
-                step = len(result) // limit
-                result = result[::step][:limit]
+            # Adaptive sampling
+            if len(result) > target_points:
+                sampled_result = []
+                step = len(result) / target_points
+                current_index = 0
+                while current_index < len(result):
+                    sampled_result.append(result[int(current_index)])
+                    current_index += step
+                result = sampled_result
 
             self.write(json.dumps(result))
         except Exception as e:
